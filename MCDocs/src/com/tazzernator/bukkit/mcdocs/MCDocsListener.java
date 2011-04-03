@@ -31,7 +31,9 @@ import java.util.logging.Logger;
 //bukkit iimports
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerChatEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
 
 //Listener Class
@@ -96,11 +98,11 @@ public class MCDocsListener extends PlayerListener {
         	fixedLine = fixedLine.replace("%online", onlineNames());
         	fixedLine = fixedLine.replace("%size", onlineCount());
         	if (MCDocs.Permissions != null){
-        		String group = MCDocs.Permissions.getGroup(player.getName());
+        		String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
         		fixedLine = fixedLine.replace("%group", group);
         		try{
-	        		fixedLine = fixedLine.replace("%prefix", MCDocs.Permissions.getGroupPrefix(group));
-	        		fixedLine = fixedLine.replace("%suffix", MCDocs.Permissions.getGroupSuffix(group));
+	        		fixedLine = fixedLine.replace("%prefix", MCDocs.Permissions.getGroupPrefix(player.getWorld().getName(), group));
+	        		fixedLine = fixedLine.replace("%suffix", MCDocs.Permissions.getGroupSuffix(player.getWorld().getName(), group));
         		}
         		catch (Exception e){
         			fixedLine = fixedLine.replace("%prefix", "");
@@ -167,7 +169,7 @@ public class MCDocsListener extends PlayerListener {
         }
 	}
 	
-	public void onPlayerCommandPreprocess(PlayerChatEvent event) {
+	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
 		
 		
 		//Find our player and message
@@ -175,9 +177,7 @@ public class MCDocsListener extends PlayerListener {
         Player player = event.getPlayer();
         File folder = plugin.getDataFolder();
         String folderName = folder.getParent();
-       
-        player.sendMessage("PrePrcoess started");
-       
+              
 		//Update our Commands
         MCDocsCommands record = null;
         try {
@@ -216,7 +216,7 @@ public class MCDocsListener extends PlayerListener {
         		//Permissions check - Hopefully should default to allow if it isn't installed.
         		if (MCDocs.Permissions != null){
         			String permissionCommand = "mcdocs." + command;
-        			String group = MCDocs.Permissions.getGroup(player.getName());
+        			String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
         			if((r.getGroup().equalsIgnoreCase(group)) || (r.getGroup().equals("null"))){
         				permission = "allow";
         			}
@@ -266,7 +266,7 @@ public class MCDocsListener extends PlayerListener {
         }   
 	}
 
-	public void onPlayerJoin(PlayerEvent event){
+	public void onPlayerJoin(PlayerJoinEvent event){
     	//MOTD On Login -- We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
 		if (MCDocs.Permissions != null){
 			groupMotd(event);
@@ -276,11 +276,11 @@ public class MCDocsListener extends PlayerListener {
 		}
 	}
 
-	public void groupMotd(PlayerEvent event){
+	public void groupMotd(PlayerJoinEvent event){
 		File folder = plugin.getDataFolder();
         String folderName = folder.getParent();
 		Player player = event.getPlayer();
-		String group = MCDocs.Permissions.getGroup(player.getName()).toLowerCase();
+		String group = MCDocs.Permissions.getGroup(player.getWorld().getName().toLowerCase(), player.getName());
 		lines.clear();
     	fixedLines.clear();
     	try {
@@ -304,7 +304,7 @@ public class MCDocsListener extends PlayerListener {
      	}
 	}
 	
-	public void standardMotd(PlayerEvent event){
+	public void standardMotd(PlayerJoinEvent event){
 		File folder = plugin.getDataFolder();
         String folderName = folder.getParent();
 		Player player = event.getPlayer();
