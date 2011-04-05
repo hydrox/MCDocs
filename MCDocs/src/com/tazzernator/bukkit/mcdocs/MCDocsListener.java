@@ -280,7 +280,8 @@ public class MCDocsListener extends PlayerListener {
 		File folder = plugin.getDataFolder();
         String folderName = folder.getParent();
 		Player player = event.getPlayer();
-		String group = MCDocs.Permissions.getGroup(player.getWorld().getName().toLowerCase(), player.getName());
+		String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
+		group = group.toLowerCase();
 		lines.clear();
     	fixedLines.clear();
     	try {
