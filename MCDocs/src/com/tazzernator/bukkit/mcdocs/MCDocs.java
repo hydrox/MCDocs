@@ -32,37 +32,37 @@ import org.bukkit.plugin.PluginManager;
 import com.nijikokun.bukkit.Permissions.Permissions;
 import com.nijiko.permissions.PermissionHandler;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.config.Configuration;
 
 /**
  * MCDocs Plugin for Bukkit
  * 
- * --> Originally coded for Hey0 by Shadow386 Thankyou for the original source and the concept! :)
  * @author Tazzernator
  *(Andrew Tajsic - atajsicDesigns - http://atajsic.com)
  *
  */
 
 public class MCDocs extends JavaPlugin {
-	//Plugin Listener.
-		
+	//Listener, Logger, Permissions, Config.
 	private final MCDocsListener playerListener = new MCDocsListener(this);
-	
-	//Logger.
 	public static final Logger log = Logger.getLogger("Minecraft");
-	
-	//Controller for permissions and security.
 	public static PermissionHandler Permissions = null;
-		
-	/*public MCDocs(PluginLoader pluginLoader, Server instance, PluginDescriptionFile desc, File folder, File plugin,	ClassLoader cLoader) {
-		super(pluginLoader, instance, desc, folder, plugin, cLoader);
-	}*/		
+	Configuration config;
+	
 	
 	public void onDisable() {
+		PluginDescriptionFile pdfFile = this.getDescription();
+		log.info(pdfFile.getName() + " by Tazzernator (Andrew Tajsic) - version " + pdfFile.getVersion() + " is disabled!" );
 	}
 	
 	public void onEnable() {
+		
+		config = getConfiguration();
+		
 		//Setup Permissions
 		setupPermissions();
+		
+		this.playerListener.setupConfig(config);
 		
 		//Register our events
 		PluginManager pm = getServer().getPluginManager();
@@ -71,11 +71,10 @@ public class MCDocs extends JavaPlugin {
 		
 		//Check all is well
 		PluginDescriptionFile pdfFile = this.getDescription();
-        log.info(pdfFile.getName() + " by Tazzernator (Andrew Tajsic) - version " + pdfFile.getVersion() + " is enabled!" );
+        log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - v" + pdfFile.getVersion() + " loaded.");
 	}
-	
-	//Setup Function for Nijikokun's Permissions plugin - By Nijikokun. - Slightly Modified for MCDocs use.
-	//http://forums.bukkit.org/threads/admn-info-permissions-v2-0-revolutionizing-the-group-system.1403/
+		
+	//Setup Function for Permissions
 	@SuppressWarnings("static-access")
 	public void setupPermissions() {
 		Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
@@ -85,10 +84,10 @@ public class MCDocs extends JavaPlugin {
 			if(test != null) {
 				this.getServer().getPluginManager().enablePlugin(test);
 				Permissions = ((Permissions)test).getHandler();
-				log.info( pdfFile.getName() + " - Permissions Detected!" );
+				log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - Hooked into Permissions.");
 			}
 			else {
-				log.info( pdfFile.getName() + " - Permissions NOT Detected! (Don't Worry, it's not essential!)" );
+				log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - Permissions absent! (Don't Worry, it's not essential!)" );
 			}
 		}
 	}
