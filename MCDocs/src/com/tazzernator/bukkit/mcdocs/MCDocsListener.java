@@ -160,9 +160,10 @@ public class MCDocsListener extends PlayerListener {
         			String tempString = fixedLine.trim();
         			String[] firstSplit = tempString.split(" ");
         			for(String s : firstSplit){
-        				if(s.startsWith("%online_")){
+        				if(s.contains("%online_")){
         					String[] secondSplit = s.split("_");
-        					fixedLine = fixedLine.replace(s, onlineGroup(secondSplit[1]));
+        					String groupName = secondSplit[1].toLowerCase();
+        					fixedLine = fixedLine.replace("%online_" + secondSplit[1], onlineGroup(groupName));
         				}
         			}
         		}
