@@ -40,8 +40,6 @@ public class MCDocsListener extends PlayerListener {
 	//Some Variables for the class.
 	private MCDocs plugin;
 	Configuration config;
-	File folder = plugin.getDataFolder();
-    String folderName = folder.getParent();
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> lines = new ArrayList<String>();
 	private ArrayList<String> fixedLines = new ArrayList<String>();
@@ -49,7 +47,7 @@ public class MCDocsListener extends PlayerListener {
 	
 	//Config Defaults.
 	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
-	public String onlinePlayersFormat = "%prefix%name%suffix";
+	public String onlinePlayersFormat = "%prefix%name";
 	public List<String> commandsList = new ArrayList<String>();
 	
 	/*
@@ -89,6 +87,8 @@ public class MCDocsListener extends PlayerListener {
 	
 	private void loadConfig(){
 		config.load();
+		File folder = plugin.getDataFolder();
+	    String folderName = folder.getParent();
 		headerFormat = config.getString("header-format", headerFormat);
 		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
 		commandsList = config.getStringList("commands-list", commandsList);
@@ -116,7 +116,6 @@ public class MCDocsListener extends PlayerListener {
 		
 	/*
 	 * -- Main Methods --
-	 * 
 	 * onPlayerCommandPreprocess:
 	 * 
 	 * Is checked whenever a user uses /$
@@ -384,6 +383,8 @@ public class MCDocsListener extends PlayerListener {
 
 	public void groupMotd(PlayerJoinEvent event){
 		Player player = event.getPlayer();
+		File folder = plugin.getDataFolder();
+	    String folderName = folder.getParent();
 		String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
 		group = group.toLowerCase();
 		lines.clear();
@@ -411,6 +412,8 @@ public class MCDocsListener extends PlayerListener {
 	
 	public void standardMotd(PlayerJoinEvent event){
 		Player player = event.getPlayer();
+		File folder = plugin.getDataFolder();
+	    String folderName = folder.getParent();
 		lines.clear();
     	fixedLines.clear();	
     	
