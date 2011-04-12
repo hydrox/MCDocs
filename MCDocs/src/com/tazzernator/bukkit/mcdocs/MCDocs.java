@@ -52,7 +52,7 @@ public class MCDocs extends JavaPlugin {
 	
 	public void onDisable() {
 		PluginDescriptionFile pdfFile = this.getDescription();
-		log.info(pdfFile.getName() + " by Tazzernator (Andrew Tajsic) - version " + pdfFile.getVersion() + " is disabled!" );
+		log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - v" + pdfFile.getVersion() + " shutdown.");
 	}
 	
 	public void onEnable() {

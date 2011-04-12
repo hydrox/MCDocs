@@ -40,6 +40,8 @@ public class MCDocsListener extends PlayerListener {
 	//Some Variables for the class.
 	private MCDocs plugin;
 	Configuration config;
+	File folder = plugin.getDataFolder();
+    String folderName = folder.getParent();
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> lines = new ArrayList<String>();
 	private ArrayList<String> fixedLines = new ArrayList<String>();
@@ -50,11 +52,18 @@ public class MCDocsListener extends PlayerListener {
 	public String onlinePlayersFormat = "%prefix%name%suffix";
 	public List<String> commandsList = new ArrayList<String>();
 	
-	//Constructor.
+	/*
+	 * -- Constructor for MCDocsListener --
+	 * All we do here is import the instance.
+	 */
 	public MCDocsListener(MCDocs instance) {
         this.plugin = instance;
     }
 
+	/*
+	 * -- Configuration Methods --
+	 * We check for config.yml, if it doesn't exists we create a default (defaultCofig), then we load (loadConfig). 
+	 */
 	public void setupConfig(Configuration config){
 		
 		this.config = config;
@@ -83,70 +92,132 @@ public class MCDocsListener extends PlayerListener {
 		headerFormat = config.getString("header-format", headerFormat);
 		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
 		commandsList = config.getStringList("commands-list", commandsList);
+		
+		
+		//Update our Commands
+        MCDocsCommands record = null;
+        records.clear();
+        for (String c : commandsList){
+        	try{
+        		String[] parts = c.split(":");
+        		if(parts.length == 3){
+        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], parts[2]);
+        		}
+        		else if(parts.length == 2){
+        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
+           		}
+        		records.add(record);
+        	}
+        	catch (Exception e) {
+        		log.info("MCDocs: Error reading the commandsList. config.yml incorrect.");
+        	}
+        }
 	}
 		
-	//Method to determine the online names.
-	private String onlineNames(){
-		Player online[] = plugin.getServer().getOnlinePlayers();
-        String onlineNames = null;
-        String nameFinal = null;
-        for (Player o : online){
-        	nameFinal = onlinePlayersFormat.replace("%name", o.getName());
-        	if (MCDocs.Permissions != null){
-        		String group = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
-        		nameFinal = nameFinal.replace("%group", group);
-        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group));
-        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group));
-        	}
-        	nameFinal = nameFinal.replace('&', '§');
-        	if (onlineNames == null){
-        		onlineNames = nameFinal;
-        	}
-        	else{
-        		onlineNames = onlineNames + nameFinal;
-        	}
-        }
-        return onlineNames;
+	/*
+	 * -- Main Methods --
+	 * 
+	 * onPlayerCommandPreprocess:
+	 * 
+	 * Is checked whenever a user uses /$
+	 * check to see if the user's command matches
+	 * Performs a Permissions Node check - if failed, do nothing.
+	 * if pass: read command's file to list lines, then forward the player, command, and page number to linesProcess.
+	 * 
+	 * linesProcess:				
+	 * 
+	 * For each line in a txt file, various %variables are replaced with their corresponding match.
+	 * How many lines in a document are determined, and thus how many pages to split it into.
+	 * The header is loaded from header-format and the variables are replaced
+	 * Finally the lines are sent to the player.
+	 */
+	
+	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
+		
+		//Find the current Player, Message, And Folder
+		String[] split = event.getMessage().split(" ");
+        Player player = event.getPlayer();
+        
+        
+		for (MCDocsCommands r : records){
+        	lines.clear();
+        	fixedLines.clear();
+        	String command = r.getCommand();
+        	int page = 0;
+        	String permission = "allow";
+        	
+        	if (split[0].equalsIgnoreCase(command)){
+        		
+        		//Permissions check - Hopefully should default to allow if it isn't installed.
+        		if (MCDocs.Permissions != null){
+        			try{
+	        			String permissionCommand = "mcdocs." + command;
+	        			String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
+	        			if((r.getGroup().equalsIgnoreCase(group)) || (r.getGroup().equals("null"))){
+	        				permission = "allow";
+	        			}
+	        			else{
+	        				permission = "deny";
+	        			}
+	        			if(!MCDocs.Permissions.has(player, permissionCommand)){
+	        				permission = "deny";
+	        			}
+        			}
+        			catch(Exception ex){
+            			log.info("[MCDocs] ERROR! Group not found for " + player.getName());
+            		}
+        		}
+        		if (permission == "allow"){
+	        		try {
+		        			//Add out lines to the list "lines"
+		                    FileInputStream fis = new FileInputStream(r.getFile());
+		                    Scanner scanner = new Scanner(fis, "UTF-8");
+		    	                while (scanner.hasNextLine()) {
+		    	                	try{
+		    	                		lines.add(scanner.nextLine() + " ");
+		    	                	}
+		    	                	catch(Exception ex){
+		    	                		lines.add(" ");
+		    	                	}
+		    	                }
+		                    scanner.close();
+		                    fis.close();                                       
+	                 }	        		
+	                 catch (Exception ex) {
+	                	 	player.sendMessage("File not found!");
+	                 }
+	                
+	                 //If split[1] does not exist, or has a letter, page = 1
+                    try{
+                        page = Integer.parseInt(split[1]);
+                    }
+                    catch(Exception ex){
+                    	page = 1;
+                    }
+                    
+                    //Finally - Process our lines!
+                    linesProcess(player, command, page);
+        		}
+                event.setCancelled(true);
+        	}        	
+        }   
+        if(split[0].equalsIgnoreCase("/mcdocs")){
+    		try{
+    			if(split[1].equalsIgnoreCase("-reload")){
+        			loadConfig();
+        			player.sendMessage("MCDocs has been reloaded.");
+        			log.info("[MCDocs] Reloaded by " + player.getName());
+        			event.setCancelled(true);
+        		}
+    		}
+    		catch(Exception ex){
+    			player.sendMessage("MCDocs");
+    			player.sendMessage("/mcdocs -reload  |  Reloads MCDocs.");
+        		event.setCancelled(true);
+    		}
+    	}
 	}
 
-	private String onlineGroup(String group){
-		Player online[] = plugin.getServer().getOnlinePlayers();
-        String onlineGroup = null;
-        String nameFinal = null;
-        for (Player o : online){
-        	String group1 = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
-        	group1 = group1.toLowerCase();
-        	if (group1.equals(group)){
-        		nameFinal = onlinePlayersFormat.replace("%name", o.getName());
-        		nameFinal = nameFinal.replace("%group", group1);
-        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group1));
-        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group1));
-            	nameFinal = nameFinal.replace('&', '§');        		
-        	}
-        	if (onlineGroup == null){
-        		onlineGroup = nameFinal;
-        	}
-        	else{
-        		onlineGroup = onlineGroup + "&f, " + nameFinal;
-        	}
-        }
-        if (onlineGroup == null){
-        	onlineGroup = " ";
-        }
-        return onlineGroup;
-	}
-	
-	
-	//Method to determine how many people are online.
-	private String onlineCount(){
-		Player online[] = plugin.getServer().getOnlinePlayers();
-        int onlineCount = 0;
-        for (@SuppressWarnings("unused") Player o : online){
-        	onlineCount++;
-        }
-        return Integer.toString(onlineCount);
-	}
-	
 	private void linesProcess(Player player, String command, int page){
 		//Change all ampersands to Minecraft's weird thingo. And now in 4.0, change some variables.
         for(String l : lines){
@@ -220,114 +291,90 @@ public class MCDocsListener extends PlayerListener {
         }
 	}
 	
-	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
-		
-		//Find our player and message
-		String[] split = event.getMessage().split(" ");
-        Player player = event.getPlayer();
-        File folder = plugin.getDataFolder();
-        String folderName = folder.getParent();
-                        
-		//Update our Commands
-        MCDocsCommands record = null;
-        records.clear();
-        for (String c : commandsList){
-        	try{
-        		String[] parts = c.split(":");
-        		if(parts.length == 3){
-        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], parts[2]);
+	/*
+	 * -- Variable Methods --
+	 * The following methods are used for various %variables in the txt files.
+	 * 
+	 * onlineNames: FInds the current online players, and using online-players-format, applies some permissions variables.
+	 * onlineGroup: Finds the current online players, check if they're in the group specified, and using online-players-format, applies some permissions variables.
+	 * onlineCount: Returns the current amount of users online.
+	 */
+	private String onlineNames(){
+		Player online[] = plugin.getServer().getOnlinePlayers();
+        String onlineNames = null;
+        String nameFinal = null;
+        for (Player o : online){
+        	nameFinal = onlinePlayersFormat.replace("%name", o.getName());
+        	if (MCDocs.Permissions != null){
+        		try{
+	        		String group = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
+	        		nameFinal = nameFinal.replace("%group", group);
+	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group));
+	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group));
         		}
-        		else if(parts.length == 2){
-        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
-           		}
-        		records.add(record);
+        		catch(Exception ex){
+        			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
+        		}
         	}
-        	catch (Exception e) {
-        		System.out.println("MCDocs: Error reading the commandsList. config.yml incorrect.");
+        	nameFinal = nameFinal.replace('&', '§');
+        	if (onlineNames == null){
+        		onlineNames = nameFinal;
         	}
-        	
+        	else{
+        		onlineNames = onlineNames + nameFinal;
+        	}
         }
-		
-        
-        for (MCDocsCommands r : records){
-        	lines.clear();
-        	fixedLines.clear();
-        	String command = r.getCommand();
-        	int page = 0;
-        	
-        	String permission = "allow";
-        	
-        	if (split[0].equalsIgnoreCase(command)){
-        		
-        		//Permissions check - Hopefully should default to allow if it isn't installed.
-        		if (MCDocs.Permissions != null){
-        			String permissionCommand = "mcdocs." + command;
-        			String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
-        			if((r.getGroup().equalsIgnoreCase(group)) || (r.getGroup().equals("null"))){
-        				permission = "allow";
-        			}
-        			else{
-        				permission = "deny";
-        			}
-        			if(!MCDocs.Permissions.has(player, permissionCommand)){
-        				permission = "deny";
-        			}
-        		}
-        		if (permission == "allow"){
-	        		try {
-		        			//Add out lines to the list "lines"
-		                    FileInputStream fis = new FileInputStream(r.getFile());
-		                    Scanner scanner = new Scanner(fis, "UTF-8");
-		    	                while (scanner.hasNextLine()) {
-		    	                	try{
-		    	                		lines.add(scanner.nextLine() + " ");
-		    	                	}
-		    	                	catch(Exception ex){
-		    	                		lines.add(" ");
-		    	                	}
-		    	                }
-		                    scanner.close();
-		                    fis.close();
-		                    
-		                    //If split[1] does not exist, or has a letter, page = 1
-		                    try{
-		                        page = Integer.parseInt(split[1]);
-		                    }
-		                    catch(Exception ex){
-		                    	page = 1;
-		                    }
-		                    
-		                  //Finally - Process our lines!
-		                  linesProcess(player, command, page);
-	                    
-	                    }
-	        		
-	                 catch (Exception ex) {
-	                	player.sendMessage("File not found!");
-	                	}
-        		}
-                 event.setCancelled(true);
-        	}        	
-        }   
-        if(split[0].equalsIgnoreCase("/mcdocs")){
-    		try{
-    			if(split[1].equalsIgnoreCase("-reload")){
-        			loadConfig();
-        			player.sendMessage("MCDocs has been reloaded.");
-        			event.setCancelled(true);
-        		}
-    		}
-    		catch(Exception ex){
-    			player.sendMessage("MCDocs");
-    			player.sendMessage("/mcdocs -reload  |  Reloads MCDocs.");
-        		event.setCancelled(true);
-    		}
-    	}
+        return onlineNames;
 	}
 
+	private String onlineGroup(String group){
+		Player online[] = plugin.getServer().getOnlinePlayers();
+        String onlineGroup = null;
+        String nameFinal = null;
+        for (Player o : online){
+        	String group1 = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
+        	group1 = group1.toLowerCase();
+        	if (group1.equals(group)){
+        		try{
+	        		nameFinal = onlinePlayersFormat.replace("%name", o.getName());
+	        		nameFinal = nameFinal.replace("%group", group1);
+	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group1));
+	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group1));
+	            	nameFinal = nameFinal.replace('&', '§');     
+        		}
+            	catch(Exception ex){
+        			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
+        		}
+        	}
+        	if (onlineGroup == null){
+        		onlineGroup = nameFinal;
+        	}
+        	else{
+        		onlineGroup = onlineGroup + "&f, " + nameFinal;
+        	}
+        }
+        if (onlineGroup == null){
+        	onlineGroup = " ";
+        }
+        return onlineGroup;
+	}
+	
+	private String onlineCount(){
+		Player online[] = plugin.getServer().getOnlinePlayers();
+        int onlineCount = 0;
+        for (@SuppressWarnings("unused") Player o : online){
+        	onlineCount++;
+        }
+        return Integer.toString(onlineCount);
+	}
+	
+	
+	/*
+	 * -- MOTD On Login -- 
+	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
+	 */
 	public void onPlayerJoin(PlayerJoinEvent event){
-    	//MOTD On Login -- We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
-		if (MCDocs.Permissions != null){
+    	if (MCDocs.Permissions != null){
 			groupMotd(event);
 		}
 		else{
@@ -336,8 +383,6 @@ public class MCDocsListener extends PlayerListener {
 	}
 
 	public void groupMotd(PlayerJoinEvent event){
-		File folder = plugin.getDataFolder();
-        String folderName = folder.getParent();
 		Player player = event.getPlayer();
 		String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
 		group = group.toLowerCase();
@@ -365,8 +410,6 @@ public class MCDocsListener extends PlayerListener {
 	}
 	
 	public void standardMotd(PlayerJoinEvent event){
-		File folder = plugin.getDataFolder();
-        String folderName = folder.getParent();
 		Player player = event.getPlayer();
 		lines.clear();
     	fixedLines.clear();	
