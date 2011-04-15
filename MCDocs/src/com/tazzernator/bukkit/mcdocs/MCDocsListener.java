@@ -1,6 +1,6 @@
 /*
  * MCDocs by Tazzernator 
- * (Andrew Tajsic ~ atajsicDesigns ~ http://atajsic.com)
+ * (Andrew Tajsic ~ atajsicDesigns ~ http://atajsic.com) 
  * 
  * THIS PLUGIN IS LICENSED UNDER THE WTFPL - (Do What The Fuck You Want To Public License)
  * 
