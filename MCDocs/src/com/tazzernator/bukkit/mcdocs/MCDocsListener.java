@@ -47,7 +47,8 @@ public class MCDocsListener extends PlayerListener {
 	
 	//Config Defaults.
 	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
-	public String onlinePlayersFormat = "%prefix%name";
+	public String onlinePlayersFormat = "%prefix%name ";
+	public boolean motdEnabled = true;
 	public List<String> commandsList = new ArrayList<String>();
 	
 	/*
@@ -82,6 +83,7 @@ public class MCDocsListener extends PlayerListener {
 		config.setProperty("header-format", headerFormat);
 		config.setProperty("online-players-format", onlinePlayersFormat);
 		config.setProperty("commands-list", commandsList);
+		config.setProperty("motd-enabled", true);
 		config.save();
 	}
 	
@@ -91,12 +93,20 @@ public class MCDocsListener extends PlayerListener {
 	    String folderName = folder.getParent();
 		headerFormat = config.getString("header-format", headerFormat);
 		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
-		commandsList = config.getStringList("commands-list", commandsList);
+		commandsList = config.getStringList("commands-list", commandsList);	
+		motdEnabled = config.getBoolean("motd-enabled", motdEnabled);
 		
-		
+		//7 - 7.1 update check - add motd-enabled if it doesn't exist.
+		Object val = config.getProperty("motd-enabled");
+		if (val == null){
+			config.setProperty("motd-enabled", true);
+			log.info("[MCDocs] motd-enabled added to config.yml with default true.");
+		}
+
 		//Update our Commands
         MCDocsCommands record = null;
         records.clear();
+        boolean passed = false;
         for (String c : commandsList){
         	try{
         		String[] parts = c.split(":");
@@ -107,10 +117,14 @@ public class MCDocsListener extends PlayerListener {
         			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
            		}
         		records.add(record);
+        		passed = true;
         	}
         	catch (Exception e) {
-        		log.info("MCDocs: Error reading the commandsList. config.yml incorrect.");
+        		log.info("[MCDocs]: Error reading the commandsList. config.yml incorrect.");
         	}
+        }
+        if (val == null && passed == true){
+        	config.save();
         }
 	}
 		
@@ -373,11 +387,13 @@ public class MCDocsListener extends PlayerListener {
 	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
 	 */
 	public void onPlayerJoin(PlayerJoinEvent event){
-    	if (MCDocs.Permissions != null){
-			groupMotd(event);
-		}
-		else{
-			standardMotd(event);
+		if (motdEnabled == true){
+	    	if (MCDocs.Permissions != null){
+				groupMotd(event);
+			}
+			else{
+				standardMotd(event);
+			}
 		}
 	}
 
@@ -434,7 +450,6 @@ public class MCDocsListener extends PlayerListener {
             linesProcess(player, "/motd", 1);
     	}
     	catch (Exception ex) {
-        	
      	}
 	}
 }
