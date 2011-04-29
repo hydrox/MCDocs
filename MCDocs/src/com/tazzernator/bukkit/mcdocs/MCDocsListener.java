@@ -41,7 +41,6 @@ public class MCDocsListener extends PlayerListener {
 	private MCDocs plugin;
 	Configuration config;
 	public static final Logger log = Logger.getLogger("Minecraft");
-	private ArrayList<String> lines = new ArrayList<String>();
 	private ArrayList<String> fixedLines = new ArrayList<String>();
 	private ArrayList<MCDocsCommands> records = new ArrayList<MCDocsCommands>();
 	
@@ -147,10 +146,11 @@ public class MCDocsListener extends PlayerListener {
 	
 	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
 		
+		ArrayList<String> lines = new ArrayList<String>();
+		
 		//Find the current Player, Message, And Folder
 		String[] split = event.getMessage().split(" ");
         Player player = event.getPlayer();
-        
         
 		for (MCDocsCommands r : records){
         	lines.clear();
@@ -174,6 +174,7 @@ public class MCDocsListener extends PlayerListener {
 	        			}
 	        			if(!MCDocs.Permissions.has(player, permissionCommand)){
 	        				permission = "deny";
+	        				
 	        			}
         			}
         			catch(Exception ex){
@@ -209,6 +210,7 @@ public class MCDocsListener extends PlayerListener {
                     }
                     
                     //Finally - Process our lines!
+                    variableSwap(player, lines);
                     linesProcess(player, command, page);
         		}
                 event.setCancelled(true);
@@ -230,11 +232,15 @@ public class MCDocsListener extends PlayerListener {
     		}
     	}
 	}
-
-	private void linesProcess(Player player, String command, int page){
-		//Change all ampersands to Minecraft's weird thingo. And now in 4.0, change some variables.
-        for(String l : lines){
-        	String fixedLine = l.replace("%name", player.getName());
+	private void variableSwap(Player player, ArrayList<String> lines){
+		ArrayList<String> tempLines = new ArrayList<String>();
+		File folder = plugin.getDataFolder();
+		String folderName = folder.getParent();
+		boolean include = false;
+		String fileName = null;
+		
+		for(String l : lines){
+			String fixedLine = l.replace("%name", player.getName());
         	fixedLine = fixedLine.replace("%size", onlineCount());
         	fixedLine = fixedLine.replace("%world", player.getWorld().getName());
         	fixedLine = fixedLine.replace("%ip", player.getAddress().getAddress().getHostAddress());
@@ -262,10 +268,46 @@ public class MCDocsListener extends PlayerListener {
         		}
         	}
         	fixedLine = fixedLine.replace("%online", onlineNames());
+        	fixedLine = fixedLine.replace("%include_*", "");
         	fixedLine = fixedLine.replace('&', '§');
+			if (l.contains("%include")){
+				String tempString = l.trim();
+    			String[] firstSplit = tempString.split(" ");
+    			for(String s : firstSplit){
+    				if(s.contains("%include")){
+    					String[] secondSplit = s.split("_");
+    					fileName = secondSplit[1];
+    					include = true;
+    					fixedLine = fixedLine.replace(s, "");
+    				}
+    			}
+        	}
         	fixedLines.add(fixedLine);
-        }
-        
+        	if(include == true){
+	        	try {
+	    			//Add out lines to the list "lines"
+	                FileInputStream fis = new FileInputStream(folderName + "/MCDocs/" + fileName);
+	                Scanner scanner = new Scanner(fis, "UTF-8");
+		                while (scanner.hasNextLine()) {
+		                	try{
+		                		tempLines.add(scanner.nextLine() + " ");
+		                	}
+		                	catch(Exception ex){
+		                		tempLines.add(" ");
+		                	}
+		                }
+		            variableSwap(player, tempLines);
+	                scanner.close();
+	                fis.close();                                       
+	             }	        		
+	             catch (Exception ex) {
+	            	 log.info("[MCDocs] Included file " + fileName + " not found!");
+	             }
+        	}
+		}
+	}
+
+	private void linesProcess(Player player, String command, int page){        
         //Define our page numbers
         int size = fixedLines.size();
         int pages;
@@ -398,6 +440,7 @@ public class MCDocsListener extends PlayerListener {
 	}
 
 	public void groupMotd(PlayerJoinEvent event){
+		ArrayList<String> lines = new ArrayList<String>();
 		Player player = event.getPlayer();
 		File folder = plugin.getDataFolder();
 	    String folderName = folder.getParent();
@@ -418,7 +461,8 @@ public class MCDocsListener extends PlayerListener {
                 }
             scanner.close();
             fis.close();
-          
+            
+            variableSwap(player, lines);
             linesProcess(player, "/motd", 1);
             }
     	catch (Exception ex) {
@@ -427,6 +471,7 @@ public class MCDocsListener extends PlayerListener {
 	}
 	
 	public void standardMotd(PlayerJoinEvent event){
+		ArrayList<String> lines = new ArrayList<String>();
 		Player player = event.getPlayer();
 		File folder = plugin.getDataFolder();
 	    String folderName = folder.getParent();
@@ -447,6 +492,7 @@ public class MCDocsListener extends PlayerListener {
             scanner.close();
             fis.close();
           
+            variableSwap(player, lines);
             linesProcess(player, "/motd", 1);
     	}
     	catch (Exception ex) {
