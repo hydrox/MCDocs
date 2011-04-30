@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
-
 //bukkit iimports
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
@@ -47,6 +46,8 @@ public class MCDocsListener extends PlayerListener {
 	//Config Defaults.
 	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
 	public String onlinePlayersFormat = "%prefix%name ";
+	public String newsFile = "news.txt";
+	public int newsLines = 1;
 	public boolean motdEnabled = true;
 	public List<String> commandsList = new ArrayList<String>();
 	
@@ -54,6 +55,7 @@ public class MCDocsListener extends PlayerListener {
 	 * -- Constructor for MCDocsListener --
 	 * All we do here is import the instance.
 	 */
+	
 	public MCDocsListener(MCDocs instance) {
         this.plugin = instance;
     }
@@ -62,6 +64,7 @@ public class MCDocsListener extends PlayerListener {
 	 * -- Configuration Methods --
 	 * We check for config.yml, if it doesn't exists we create a default (defaultCofig), then we load (loadConfig). 
 	 */
+	
 	public void setupConfig(Configuration config){
 		
 		this.config = config;
@@ -83,17 +86,13 @@ public class MCDocsListener extends PlayerListener {
 		config.setProperty("online-players-format", onlinePlayersFormat);
 		config.setProperty("commands-list", commandsList);
 		config.setProperty("motd-enabled", true);
+		config.setProperty("news-file", newsFile);
+		config.setProperty("news-lines", 1);
 		config.save();
 	}
 	
 	private void loadConfig(){
 		config.load();
-		File folder = plugin.getDataFolder();
-	    String folderName = folder.getParent();
-		headerFormat = config.getString("header-format", headerFormat);
-		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
-		commandsList = config.getStringList("commands-list", commandsList);	
-		motdEnabled = config.getBoolean("motd-enabled", motdEnabled);
 		
 		//7 - 7.1 update check - add motd-enabled if it doesn't exist.
 		Object val = config.getProperty("motd-enabled");
@@ -101,11 +100,30 @@ public class MCDocsListener extends PlayerListener {
 			config.setProperty("motd-enabled", true);
 			log.info("[MCDocs] motd-enabled added to config.yml with default true.");
 		}
+		
+		//8 - 9 update check - add news-file if it doesn't exist.
+		Object val2 = config.getProperty("news-file");
+		if (val2 == null){
+			config.setProperty("news-file", newsFile);
+			config.setProperty("news-lines", 1);
+			log.info("[MCDocs] news-file added to config.yml with default news.txt.");
+			log.info("[MCDocs] news-lines added to config.yml with default 1.");
+		}
+		
+		headerFormat = config.getString("header-format", headerFormat);
+		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
+		commandsList = config.getStringList("commands-list", commandsList);	
+		motdEnabled = config.getBoolean("motd-enabled", motdEnabled);
+		newsFile = config.getString("news-file", newsFile);
+		newsLines = config.getInt("news-lines", newsLines);
 
 		//Update our Commands
         MCDocsCommands record = null;
         records.clear();
+		File folder = plugin.getDataFolder();
+	    String folderName = folder.getParent();
         boolean passed = false;
+        
         for (String c : commandsList){
         	try{
         		String[] parts = c.split(":");
@@ -122,7 +140,9 @@ public class MCDocsListener extends PlayerListener {
         		log.info("[MCDocs]: Error reading the commandsList. config.yml incorrect.");
         	}
         }
-        if (val == null && passed == true){
+        
+        //Update if new version and the config was indeed correct.
+        if ((val == null || val2 == null) && passed == true){
         	config.save();
         }
 	}
@@ -136,9 +156,14 @@ public class MCDocsListener extends PlayerListener {
 	 * Performs a Permissions Node check - if failed, do nothing.
 	 * if pass: read command's file to list lines, then forward the player, command, and page number to linesProcess.
 	 * 
-	 * linesProcess:				
+	 * 
+	 * variableSwap
 	 * 
 	 * For each line in a txt file, various %variables are replaced with their corresponding match.
+	 *  
+	 *  
+	 * linesProcess:				
+	 *
 	 * How many lines in a document are determined, and thus how many pages to split it into.
 	 * The header is loaded from header-format and the variables are replaced
 	 * Finally the lines are sent to the player.
@@ -146,6 +171,7 @@ public class MCDocsListener extends PlayerListener {
 	
 	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
 		
+		//List of lines we read our first file into.
 		ArrayList<String> lines = new ArrayList<String>();
 		
 		//Find the current Player, Message, And Folder
@@ -232,13 +258,10 @@ public class MCDocsListener extends PlayerListener {
     		}
     	}
 	}
+	
 	private void variableSwap(Player player, ArrayList<String> lines){
-		ArrayList<String> tempLines = new ArrayList<String>();
-		File folder = plugin.getDataFolder();
-		String folderName = folder.getParent();
-		boolean include = false;
-		String fileName = null;
-		
+			
+		//Swaping out some variables with their respective replacement.
 		for(String l : lines){
 			String fixedLine = l.replace("%name", player.getName());
         	fixedLine = fixedLine.replace("%size", onlineCount());
@@ -268,45 +291,44 @@ public class MCDocsListener extends PlayerListener {
         		}
         	}
         	fixedLine = fixedLine.replace("%online", onlineNames());
-        	fixedLine = fixedLine.replace("%include_*", "");
         	fixedLine = fixedLine.replace('&', '§');
-			if (l.contains("%include")){
-				String tempString = l.trim();
-    			String[] firstSplit = tempString.split(" ");
-    			for(String s : firstSplit){
-    				if(s.contains("%include")){
-    					String[] secondSplit = s.split("_");
-    					fileName = secondSplit[1];
-    					include = true;
-    					fixedLine = fixedLine.replace(s, "");
-    				}
-    			}
+        	        	
+        	//If the line currently in the for loop has "%include", we find out which file to load in by splitting the line up intesively.
+        	ArrayList<String> files = new ArrayList<String>();
+        	
+        	       	
+			if (l.contains("%include") || l.contains("%news")){
+				if (l.contains("%include")){
+					String tempString = l.trim();
+	    			String[] firstSplit = tempString.split(" ");
+	    			for(String s : firstSplit){
+	    				if(s.contains("%include")){
+	    					String[] secondSplit = s.split("_");
+	    					fixedLine = fixedLine.replace(s, "");
+	    					files.add(secondSplit[1]);
+	    				}
+	    			}
+	    			if(!fixedLine.equals(" ")){
+	    				fixedLines.add(fixedLine);
+	    			}
+	    			for(String f : files){
+	    				includeAdd(f, player);
+	    			}
+				}
+				if (l.contains("%news")){
+					fixedLine = fixedLine.replace("%news", "");	
+					if(!fixedLine.equals(" ")){
+	    				fixedLines.add(fixedLine);
+	    			}
+					newsLine(player);
+				}
         	}
-        	fixedLines.add(fixedLine);
-        	if(include == true){
-	        	try {
-	    			//Add out lines to the list "lines"
-	                FileInputStream fis = new FileInputStream(folderName + "/MCDocs/" + fileName);
-	                Scanner scanner = new Scanner(fis, "UTF-8");
-		                while (scanner.hasNextLine()) {
-		                	try{
-		                		tempLines.add(scanner.nextLine() + " ");
-		                	}
-		                	catch(Exception ex){
-		                		tempLines.add(" ");
-		                	}
-		                }
-		            variableSwap(player, tempLines);
-	                scanner.close();
-	                fis.close();                                       
-	             }	        		
-	             catch (Exception ex) {
-	            	 log.info("[MCDocs] Included file " + fileName + " not found!");
-	             }
-        	}
+			else{
+				fixedLines.add(fixedLine);
+			}
 		}
 	}
-
+		
 	private void linesProcess(Player player, String command, int page){        
         //Define our page numbers
         int size = fixedLines.size();
@@ -350,10 +372,40 @@ public class MCDocsListener extends PlayerListener {
 	 * -- Variable Methods --
 	 * The following methods are used for various %variables in the txt files.
 	 * 
-	 * onlineNames: FInds the current online players, and using online-players-format, applies some permissions variables.
+	 * includeAdd: Is used to insert more lines into the current working doc.
+	 * onlineNames: Finds the current online players, and using online-players-format, applies some permissions variables.
 	 * onlineGroup: Finds the current online players, check if they're in the group specified, and using online-players-format, applies some permissions variables.
 	 * onlineCount: Returns the current amount of users online.
 	 */
+	
+	private void includeAdd(String fileName, Player player){
+		//Define some variables
+		ArrayList<String> tempLines = new ArrayList<String>();
+		File folder = plugin.getDataFolder();
+		String folderName = folder.getParent();
+		
+		//Ok, let's import our new file, and then send them into another variableSwap [ I   N   C   E   P   T   I   O   N ]
+		try {
+            FileInputStream fis = new FileInputStream(folderName + "/MCDocs/" + fileName);
+            Scanner scanner = new Scanner(fis, "UTF-8");
+                while (scanner.hasNextLine()) {
+                	try{
+                		tempLines.add(scanner.nextLine() + " ");
+                	}
+                	catch(Exception ex){
+                		tempLines.add(" ");
+                	}
+                }
+            scanner.close();
+            fis.close();            
+            //Methods inside of methods!
+            variableSwap(player, tempLines);
+         }	        		
+         catch (Exception ex) {
+        	 log.info("[MCDocs] Included file " + fileName + " not found!");
+         }
+	}
+	
 	private String onlineNames(){
 		Player online[] = plugin.getServer().getOnlinePlayers();
         String onlineNames = null;
@@ -423,11 +475,39 @@ public class MCDocsListener extends PlayerListener {
         return Integer.toString(onlineCount);
 	}
 	
-	
+	private void newsLine(Player player){
+		
+		ArrayList<String> newsLinesList = new ArrayList<String>();
+		File folder = plugin.getDataFolder();
+		String folderName = folder.getParent();
+		int current = 0;
+		
+		try {
+            FileInputStream fis = new FileInputStream(folderName + "/MCDocs/" + newsFile);
+            Scanner scanner = new Scanner(fis, "UTF-8");
+                while (current < newsLines) {
+                	try{
+                		newsLinesList.add(scanner.nextLine() + " ");
+                	}
+                	catch(Exception ex){
+                		newsLinesList.add(" ");
+                	}
+                	current++;
+                }
+            scanner.close();
+            fis.close();  
+            variableSwap(player, newsLinesList);
+		}	        		
+		catch (Exception ex) {
+    	 log.info("[MCDocs] news-file was not found.");
+		}
+	}
+		
 	/*
 	 * -- MOTD On Login -- 
 	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
 	 */
+	
 	public void onPlayerJoin(PlayerJoinEvent event){
 		if (motdEnabled == true){
 	    	if (MCDocs.Permissions != null){
