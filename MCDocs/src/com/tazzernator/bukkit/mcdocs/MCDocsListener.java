@@ -33,12 +33,17 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
 import org.bukkit.util.config.Configuration;
 
+//iConomy import.
+import com.iConomy.iConomy;
+import com.iConomy.system.Holdings;
+
 //Listener Class
 public class MCDocsListener extends PlayerListener {
 	
 	//Some Variables for the class.
 	private MCDocs plugin;
 	Configuration config;
+	static iConomy iConomy = null;
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> fixedLines = new ArrayList<String>();
 	private ArrayList<MCDocsCommands> records = new ArrayList<MCDocsCommands>();
@@ -174,9 +179,28 @@ public class MCDocsListener extends PlayerListener {
 		//List of lines we read our first file into.
 		ArrayList<String> lines = new ArrayList<String>();
 		
-		//Find the current Player, Message, And Folder
+		//Find the current Player, Message
 		String[] split = event.getMessage().split(" ");
         Player player = event.getPlayer();
+        
+        //Here we are going to support spaces in commands.
+		int count = split.length;
+		int lastInput = count - 1;
+		String playerCommand = "";
+		if(checkIfNumber(split[lastInput])){
+			for (int i=0; i<lastInput; i++){
+				playerCommand = playerCommand + split[i] + " ";
+			}
+		}
+		else {
+			for (int i=0; i<count; i++){
+				playerCommand = playerCommand + split[i] + " ";
+			}
+		}
+		
+		//Cut off the final space.
+		playerCommand = playerCommand.trim();
+		
         
 		for (MCDocsCommands r : records){
         	lines.clear();
@@ -185,7 +209,7 @@ public class MCDocsListener extends PlayerListener {
         	int page = 0;
         	String permission = "allow";
         	
-        	if (split[0].equalsIgnoreCase(command)){
+        	if (playerCommand.equalsIgnoreCase(command)){
         		
         		//Permissions check - Hopefully should default to allow if it isn't installed.
         		if (MCDocs.Permissions != null){
@@ -227,9 +251,9 @@ public class MCDocsListener extends PlayerListener {
 	                	 	player.sendMessage("File not found!");
 	                 }
 	                
-	                 //If split[1] does not exist, or has a letter, page = 1
+	                 //If split[lastInput] does not exist, or has a letter, page = 1
                     try{
-                        page = Integer.parseInt(split[1]);
+                        page = Integer.parseInt(split[lastInput]);
                     }
                     catch(Exception ex){
                     	page = 1;
@@ -263,10 +287,14 @@ public class MCDocsListener extends PlayerListener {
 			
 		//Swaping out some variables with their respective replacement.
 		for(String l : lines){
+			
+			//Basics
 			String fixedLine = l.replace("%name", player.getName());
         	fixedLine = fixedLine.replace("%size", onlineCount());
         	fixedLine = fixedLine.replace("%world", player.getWorld().getName());
         	fixedLine = fixedLine.replace("%ip", player.getAddress().getAddress().getHostAddress());
+        	
+        	//Permissions related variables
         	if (MCDocs.Permissions != null){
         		String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
         		if(fixedLine.contains("%online_")){
@@ -290,12 +318,20 @@ public class MCDocsListener extends PlayerListener {
             		fixedLine = fixedLine.replace("%suffix", "");
         		}
         	}
+        	
+        	//iConomy
+            if (this.plugin.getServer().getPluginManager().getPlugin("iConomy") != null) {
+                com.iConomy.iConomy.hasAccount(player.getName());           
+                Holdings balance = com.iConomy.iConomy.getAccount(player.getName()).getHoldings();
+                fixedLine = fixedLine.replaceAll("%balance", balance.toString());
+              }
+            
+            //More Basics
         	fixedLine = fixedLine.replace("%online", onlineNames());
-        	fixedLine = fixedLine.replace('&', 'ยง');
+        	fixedLine = fixedLine.replaceAll("(&([a-z0-9]))", "ง$2");
         	        	
         	//If the line currently in the for loop has "%include", we find out which file to load in by splitting the line up intesively.
         	ArrayList<String> files = new ArrayList<String>();
-        	
         	       	
 			if (l.contains("%include") || l.contains("%news")){
 				if (l.contains("%include")){
@@ -351,7 +387,7 @@ public class MCDocsListener extends PlayerListener {
 			header = headerFormat;
             
             //Replace variables.
-            header = header.replace('&', 'ยง');
+            header = header.replace("(&([a-z0-9]))", "ง$2");
             header = header.replace("%commandname", commandName);
             header = header.replace("%current", Integer.toString(page));
             header = header.replace("%count", Integer.toString(pages));
@@ -423,12 +459,12 @@ public class MCDocsListener extends PlayerListener {
         			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
         		}
         	}
-        	nameFinal = nameFinal.replace('&', 'ยง');
+        	nameFinal = nameFinal.replace("(&([a-z0-9]))", "ง$2");
         	if (onlineNames == null){
         		onlineNames = nameFinal;
         	}
         	else{
-        		onlineNames = onlineNames + nameFinal;
+        		onlineNames = onlineNames.trim() + "&f, " + nameFinal;
         	}
         }
         return onlineNames;
@@ -439,29 +475,29 @@ public class MCDocsListener extends PlayerListener {
         String onlineGroup = null;
         String nameFinal = null;
         for (Player o : online){
-        	String group1 = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
-        	group1 = group1.toLowerCase();
-        	if (group1.equals(group)){
+        	String oGroup = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
+        	oGroup = oGroup.toLowerCase();
+        	if (oGroup.equals(group)){
         		try{
 	        		nameFinal = onlinePlayersFormat.replace("%name", o.getName());
-	        		nameFinal = nameFinal.replace("%group", group1);
-	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group1));
-	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group1));
-	            	nameFinal = nameFinal.replace('&', 'ยง');     
+	        		nameFinal = nameFinal.replace("%group", oGroup);
+	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), oGroup));
+	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), oGroup));
+	            	nameFinal = nameFinal.replace("(&([a-z0-9]))", "ง$2");
         		}
             	catch(Exception ex){
         			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
         		}
-        	}
-        	if (onlineGroup == null){
-        		onlineGroup = nameFinal;
-        	}
-        	else{
-        		onlineGroup = onlineGroup + "&f, " + nameFinal;
+            	if (onlineGroup == null){
+            		onlineGroup = nameFinal;
+            	}
+            	else{
+            		onlineGroup = onlineGroup + "&f, " + nameFinal;
+            	}
         	}
         }
         if (onlineGroup == null){
-        	onlineGroup = " ";
+        	onlineGroup = "";
         }
         return onlineGroup;
 	}
@@ -503,6 +539,18 @@ public class MCDocsListener extends PlayerListener {
 		}
 	}
 		
+    private boolean checkIfNumber(String in) {
+        
+        try {
+
+            Integer.parseInt(in);
+        
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+        
+        return true;
+    }
 	/*
 	 * -- MOTD On Login -- 
 	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
