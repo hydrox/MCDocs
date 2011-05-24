@@ -27,6 +27,7 @@ import java.util.Scanner;
 import java.util.logging.Logger;
 
 //bukkit iimports
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -50,7 +51,7 @@ public class MCDocsListener extends PlayerListener {
 	
 	//Config Defaults.
 	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
-	public String onlinePlayersFormat = "%prefix%name ";
+	public String onlinePlayersFormat = "%prefix%name";
 	public String newsFile = "news.txt";
 	public int newsLines = 1;
 	public boolean motdEnabled = true;
@@ -328,7 +329,7 @@ public class MCDocsListener extends PlayerListener {
             
             //More Basics
         	fixedLine = fixedLine.replace("%online", onlineNames());
-        	fixedLine = fixedLine.replaceAll("(&([a-z0-9]))", "§$2");
+        	fixedLine = colourSwap(fixedLine);
         	        	
         	//If the line currently in the for loop has "%include", we find out which file to load in by splitting the line up intesively.
         	ArrayList<String> files = new ArrayList<String>();
@@ -387,7 +388,7 @@ public class MCDocsListener extends PlayerListener {
 			header = headerFormat;
             
             //Replace variables.
-            header = header.replace("(&([a-z0-9]))", "§$2");
+            header = colourSwap(header);
             header = header.replace("%commandname", commandName);
             header = header.replace("%current", Integer.toString(page));
             header = header.replace("%count", Integer.toString(pages));
@@ -459,7 +460,7 @@ public class MCDocsListener extends PlayerListener {
         			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
         		}
         	}
-        	nameFinal = nameFinal.replace("(&([a-z0-9]))", "§$2");
+        	nameFinal = colourSwap(nameFinal);
         	if (onlineNames == null){
         		onlineNames = nameFinal;
         	}
@@ -483,7 +484,7 @@ public class MCDocsListener extends PlayerListener {
 	        		nameFinal = nameFinal.replace("%group", oGroup);
 	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), oGroup));
 	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), oGroup));
-	            	nameFinal = nameFinal.replace("(&([a-z0-9]))", "§$2");
+	            	nameFinal = colourSwap(nameFinal);
         		}
             	catch(Exception ex){
         			log.info("[MCDocs] ERROR! One of the following is not found: %group %prefix %suffix for player " + o.getName());
@@ -551,7 +552,29 @@ public class MCDocsListener extends PlayerListener {
         
         return true;
     }
-	/*
+	
+    private String colourSwap(String line){
+    	String[] Colours = { 	"&0", "&1", "&2", "&3", "&4", "&5", "&6", "&7",
+						        "&8", "&9", "&a", "&b", "&c", "&d", "&e", "&f",
+						      };
+    	ChatColor[] cCode = {	ChatColor.BLACK, ChatColor.DARK_BLUE, ChatColor.DARK_GREEN, ChatColor.DARK_AQUA, ChatColor.DARK_RED, ChatColor.DARK_PURPLE, ChatColor.GOLD, ChatColor.GRAY,
+						        ChatColor.DARK_GRAY, ChatColor.BLUE, ChatColor.GREEN, ChatColor.AQUA, ChatColor.RED, ChatColor.LIGHT_PURPLE, ChatColor.YELLOW, ChatColor.WHITE,
+						      };
+    	
+    	for (int x = 0; x < Colours.length; x++) {
+    		CharSequence cChk = null;
+            String temp = null;
+
+            cChk = Colours[x];
+            if (line.contains(cChk)) {
+                temp = line.replace(cChk, cCode[x].toString());
+                line = temp;
+            }
+        }
+        return line;
+    }
+    
+    /*
 	 * -- MOTD On Login -- 
 	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
 	 */
