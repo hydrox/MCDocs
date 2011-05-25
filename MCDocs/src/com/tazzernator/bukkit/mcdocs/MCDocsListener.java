@@ -155,6 +155,9 @@ public class MCDocsListener extends PlayerListener {
 	    //Since version 9.3, we're going to manually save the config, as to support commenting.
 		PrintWriter stream = null;
 		File folder = plugin.getDataFolder();
+		if (folder != null) {
+			folder.mkdirs();
+        }
 		String folderName = folder.getParent();
 		PluginDescriptionFile pdfFile = this.plugin.getDescription();
 		
@@ -163,7 +166,7 @@ public class MCDocsListener extends PlayerListener {
 			//Let's write our goods ;)
 				stream.println("#MCDocs " + pdfFile.getVersion() + " by Tazzernator / Andrew Tajsic version ");
 				stream.println("#Configuration File.");
-				stream.println("#For detailed assistance please visit: http://atajsic.com/wiki/MCDocs");
+				stream.println("#For detailed assistance please visit: http://atajsic.com/wiki/index.php/MCDocs");
 				stream.println();
 				stream.println("#Here we determine which command will show which file. ");
 				stream.println("commands-list:");
