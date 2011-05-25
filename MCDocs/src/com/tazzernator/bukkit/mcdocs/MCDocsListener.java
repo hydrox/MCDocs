@@ -21,6 +21,8 @@ package com.tazzernator.bukkit.mcdocs;
 //java imports
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -32,6 +34,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
+import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.util.config.Configuration;
 
 //iConomy import.
@@ -94,7 +97,7 @@ public class MCDocsListener extends PlayerListener {
 		config.setProperty("motd-enabled", true);
 		config.setProperty("news-file", newsFile);
 		config.setProperty("news-lines", 1);
-		config.save();
+		saveConfig();
 	}
 	
 	private void loadConfig(){
@@ -128,7 +131,6 @@ public class MCDocsListener extends PlayerListener {
         records.clear();
 		File folder = plugin.getDataFolder();
 	    String folderName = folder.getParent();
-        boolean passed = false;
         
         for (String c : commandsList){
         	try{
@@ -140,17 +142,53 @@ public class MCDocsListener extends PlayerListener {
         			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
            		}
         		records.add(record);
-        		passed = true;
         	}
         	catch (Exception e) {
         		log.info("[MCDocs]: Error reading the commandsList. config.yml incorrect.");
         	}
         }
-        
-        //Update if new version and the config was indeed correct.
-        if ((val == null || val2 == null) && passed == true){
-        	config.save();
-        }
+        //Finally re-write what we've loaded just incase of an update.
+        saveConfig();
+	}
+	
+	private void saveConfig(){
+	    //Since version 9.3, we're going to manually save the config, as to support commenting.
+		PrintWriter stream = null;
+		File folder = plugin.getDataFolder();
+		String folderName = folder.getParent();
+		PluginDescriptionFile pdfFile = this.plugin.getDescription();
+		
+		try {
+			stream = new PrintWriter(folderName + "/MCDocs/config.yml");
+			//Let's write our goods ;)
+				stream.println("#MCDocs " + pdfFile.getVersion() + " by Tazzernator / Andrew Tajsic version ");
+				stream.println("#Configuration File.");
+				stream.println("#For detailed assistance please visit: http://atajsic.com/wiki/MCDocs");
+				stream.println();
+				stream.println("#Here we determine which command will show which file. ");
+				stream.println("commands-list:");
+				for (String c : commandsList){
+					stream.println("- " + c);
+				}
+				stream.println();
+				stream.println("#This changes the pagination header that is added to MCDocs automatically when there is > 10 lines of text.");
+				stream.println("news-file: '" + config.getString("header-format", headerFormat) + "'");
+				stream.println();
+				stream.println("#Format to use when using %online or %online_group");
+				stream.println("online-players-format: '" + config.getString("online-players-format", onlinePlayersFormat) + "'");
+				stream.println();
+				stream.println("#The file to displayed when using %news");
+				stream.println("news-file: " + config.getString("news-file", newsFile));
+				stream.println();
+				stream.println("#How many lines to show when using %news");
+				stream.println("news-lines: " + config.getInt("news-lines", newsLines));
+				stream.println();
+				stream.println("#Show a MOTD at login? Yes: true | No: false");
+				stream.println("motd-enabled: " + config.getBoolean("motd-enabled", motdEnabled));
+				stream.close();
+		} catch (FileNotFoundException e) {
+			log.info("[MCDocs]: Error saving the config.yml.");
+		}
 	}
 		
 	/*
@@ -322,14 +360,19 @@ public class MCDocsListener extends PlayerListener {
         	
         	//iConomy
             if (this.plugin.getServer().getPluginManager().getPlugin("iConomy") != null) {
-                com.iConomy.iConomy.hasAccount(player.getName());           
-                Holdings balance = com.iConomy.iConomy.getAccount(player.getName()).getHoldings();
-                fixedLine = fixedLine.replaceAll("%balance", balance.toString());
+            	try{        
+	                Holdings balance = com.iConomy.iConomy.getAccount(player.getName()).getHoldings();
+	                fixedLine = fixedLine.replaceAll("%balance", balance.toString());
+	            }
+            	catch(NoClassDefFoundError e){
+            		fixedLine = fixedLine.replaceAll("%balance", "Please update iConomy to v5 or higher");
+            	}
               }
             
             //More Basics
         	fixedLine = fixedLine.replace("%online", onlineNames());
         	fixedLine = colourSwap(fixedLine);
+        	fixedLine = fixedLine.replace("&#!", "&");
         	        	
         	//If the line currently in the for loop has "%include", we find out which file to load in by splitting the line up intesively.
         	ArrayList<String> files = new ArrayList<String>();
