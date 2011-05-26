@@ -58,6 +58,7 @@ public class MCDocsListener extends PlayerListener {
 	public String newsFile = "news.txt";
 	public int newsLines = 1;
 	public boolean motdEnabled = true;
+	public boolean commandLogEnabled = true;
 	public List<String> commandsList = new ArrayList<String>();
 	
 	/*
@@ -95,6 +96,7 @@ public class MCDocsListener extends PlayerListener {
 		config.setProperty("online-players-format", onlinePlayersFormat);
 		config.setProperty("commands-list", commandsList);
 		config.setProperty("motd-enabled", true);
+		config.setProperty("command-log-enabled", true);
 		config.setProperty("news-file", newsFile);
 		config.setProperty("news-lines", 1);
 		saveConfig();
@@ -123,6 +125,7 @@ public class MCDocsListener extends PlayerListener {
 		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
 		commandsList = config.getStringList("commands-list", commandsList);	
 		motdEnabled = config.getBoolean("motd-enabled", motdEnabled);
+		commandLogEnabled = config.getBoolean("command-log-enabled", commandLogEnabled);
 		newsFile = config.getString("news-file", newsFile);
 		newsLines = config.getInt("news-lines", newsLines);
 
@@ -177,17 +180,20 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#This changes the pagination header that is added to MCDocs automatically when there is > 10 lines of text.");
 				stream.println("news-file: '" + config.getString("header-format", headerFormat) + "'");
 				stream.println();
-				stream.println("#Format to use when using %online or %online_group");
+				stream.println("#Format to use when using %online or %online_group.");
 				stream.println("online-players-format: '" + config.getString("online-players-format", onlinePlayersFormat) + "'");
 				stream.println();
-				stream.println("#The file to displayed when using %news");
+				stream.println("#The file to displayed when using %news.");
 				stream.println("news-file: " + config.getString("news-file", newsFile));
 				stream.println();
-				stream.println("#How many lines to show when using %news");
+				stream.println("#How many lines to show when using %news.");
 				stream.println("news-lines: " + config.getInt("news-lines", newsLines));
 				stream.println();
 				stream.println("#Show a MOTD at login? Yes: true | No: false");
 				stream.println("motd-enabled: " + config.getBoolean("motd-enabled", motdEnabled));
+				stream.println();
+				stream.println("#Inform the console when a player uses a command from the commands-list.");
+				stream.println("command-log-enabled: " + config.getBoolean("command-log-enabled", commandLogEnabled));
 				stream.close();
 		} catch (FileNotFoundException e) {
 			log.info("[MCDocs]: Error saving the config.yml.");
@@ -252,6 +258,10 @@ public class MCDocsListener extends PlayerListener {
         	String permission = "allow";
         	
         	if (playerCommand.equalsIgnoreCase(command)){
+        		//Log our user using the command.
+        		if (commandLogEnabled == true){
+        			log.info("MCDocs: " + player.getName() + ": " + event.getMessage());
+        		}
         		
         		//Permissions check - Hopefully should default to allow if it isn't installed.
         		if (MCDocs.Permissions != null){
