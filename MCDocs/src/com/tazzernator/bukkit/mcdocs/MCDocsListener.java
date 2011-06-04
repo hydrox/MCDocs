@@ -178,7 +178,7 @@ public class MCDocsListener extends PlayerListener {
 				}
 				stream.println();
 				stream.println("#This changes the pagination header that is added to MCDocs automatically when there is > 10 lines of text.");
-				stream.println("news-file: '" + config.getString("header-format", headerFormat) + "'");
+				stream.println("header-format: '" + config.getString("header-format", headerFormat) + "'");
 				stream.println();
 				stream.println("#Format to use when using %online or %online_group.");
 				stream.println("online-players-format: '" + config.getString("online-players-format", onlinePlayersFormat) + "'");
@@ -341,7 +341,7 @@ public class MCDocsListener extends PlayerListener {
 		for(String l : lines){
 			
 			//Basics
-			String fixedLine = l.replace("%name", player.getName());
+			String fixedLine = l.replace("%name", player.getDisplayName());
         	fixedLine = fixedLine.replace("%size", onlineCount());
         	fixedLine = fixedLine.replace("%world", player.getWorld().getName());
         	fixedLine = fixedLine.replace("%ip", player.getAddress().getAddress().getHostAddress());
@@ -504,7 +504,7 @@ public class MCDocsListener extends PlayerListener {
         String onlineNames = null;
         String nameFinal = null;
         for (Player o : online){
-        	nameFinal = onlinePlayersFormat.replace("%name", o.getName());
+        	nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
         	if (MCDocs.Permissions != null){
         		try{
 	        		String group = MCDocs.Permissions.getGroup(o.getWorld().getName(), o.getName());
@@ -536,7 +536,7 @@ public class MCDocsListener extends PlayerListener {
         	oGroup = oGroup.toLowerCase();
         	if (oGroup.equals(group)){
         		try{
-	        		nameFinal = onlinePlayersFormat.replace("%name", o.getName());
+	        		nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
 	        		nameFinal = nameFinal.replace("%group", oGroup);
 	        		nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), oGroup));
 	        		nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), oGroup));
