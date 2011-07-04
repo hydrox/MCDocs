@@ -19,11 +19,18 @@
 package com.tazzernator.bukkit.mcdocs;
 
 //java imports
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Logger;
@@ -60,6 +67,7 @@ public class MCDocsListener extends PlayerListener {
 	public boolean motdEnabled = true;
 	public boolean commandLogEnabled = true;
 	public List<String> commandsList = new ArrayList<String>();
+	public int cacheTime = 5;
 	
 	/*
 	 * -- Constructor for MCDocsListener --
@@ -91,6 +99,7 @@ public class MCDocsListener extends PlayerListener {
 		commandsList.add("/rules:rules.txt");
 		commandsList.add("/news:news.txt");
 		commandsList.add("/register:register.txt");
+		commandsList.add("/about:http://tazzernator.com/files/bukkit/plugins/MCDocs/about.txt");
 		
 		config.setProperty("header-format", headerFormat);
 		config.setProperty("online-players-format", onlinePlayersFormat);
@@ -99,6 +108,7 @@ public class MCDocsListener extends PlayerListener {
 		config.setProperty("command-log-enabled", true);
 		config.setProperty("news-file", newsFile);
 		config.setProperty("news-lines", 1);
+		config.setProperty("cache-time", cacheTime);
 		saveConfig();
 	}
 	
@@ -121,6 +131,13 @@ public class MCDocsListener extends PlayerListener {
 			log.info("[MCDocs] news-lines added to config.yml with default 1.");
 		}
 		
+		//9.x - 10 update check - add cache-time if it doesn't exist.
+		Object val3 = config.getProperty("cache-time");
+		if (val3 == null){
+			config.setProperty("cache-time", 5);
+			log.info("[MCDocs] cache-time added to config.yml with default 5.");
+		}
+		
 		headerFormat = config.getString("header-format", headerFormat);
 		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
 		commandsList = config.getStringList("commands-list", commandsList);	
@@ -128,6 +145,7 @@ public class MCDocsListener extends PlayerListener {
 		commandLogEnabled = config.getBoolean("command-log-enabled", commandLogEnabled);
 		newsFile = config.getString("news-file", newsFile);
 		newsLines = config.getInt("news-lines", newsLines);
+		cacheTime = config.getInt("cache-time", cacheTime);
 
 		//Update our Commands
         MCDocsCommands record = null;
@@ -137,12 +155,25 @@ public class MCDocsListener extends PlayerListener {
         
         for (String c : commandsList){
         	try{
+        		//I can't be arsed with regex.
+        		c = c.replace("http:", "http~colon~");
         		String[] parts = c.split(":");
+        		
         		if(parts.length == 3){
-        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], parts[2]);
+        			if(parts[1].contains("http")){
+        				record = new MCDocsCommands(parts[0], parts[1].replace("http~colon~", "http:"), parts[2]);
+            		}
+        			else{
+        				record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], parts[2]);
+        			}
         		}
         		else if(parts.length == 2){
-        			record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
+        			if(parts[1].contains("http")){
+        				record = new MCDocsCommands(parts[0], parts[1].replace("http~colon~", "http:"), "null");
+            		}
+        			else{
+        				record = new MCDocsCommands(parts[0], folderName + "/MCDocs/" + parts[1], "null");
+        			}
            		}
         		records.add(record);
         	}
@@ -167,7 +198,7 @@ public class MCDocsListener extends PlayerListener {
 		try {
 			stream = new PrintWriter(folderName + "/MCDocs/config.yml");
 			//Let's write our goods ;)
-				stream.println("#MCDocs " + pdfFile.getVersion() + " by Tazzernator / Andrew Tajsic version ");
+				stream.println("#MCDocs " + pdfFile.getVersion() + " by Tazzernator / Andrew Tajsic");
 				stream.println("#Configuration File.");
 				stream.println("#For detailed assistance please visit: http://atajsic.com/wiki/index.php/MCDocs");
 				stream.println();
@@ -189,6 +220,9 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#How many lines to show when using %news.");
 				stream.println("news-lines: " + config.getInt("news-lines", newsLines));
 				stream.println();
+				stream.println("#How long, in minutes, do you want online files to be cached locally? 0 = disable");
+				stream.println("cache-time: " + config.getInt("cache-time", cacheTime));
+				stream.println();
 				stream.println("#Show a MOTD at login? Yes: true | No: false");
 				stream.println("motd-enabled: " + config.getBoolean("motd-enabled", motdEnabled));
 				stream.println();
@@ -202,24 +236,24 @@ public class MCDocsListener extends PlayerListener {
 		
 	/*
 	 * -- Main Methods --
-	 * onPlayerCommandPreprocess:
-	 * 
+	 * ~ onPlayerCommandPreprocess:
 	 * Is checked whenever a user uses /$
 	 * check to see if the user's command matches
 	 * Performs a Permissions Node check - if failed, do nothing.
 	 * if pass: read command's file to list lines, then forward the player, command, and page number to linesProcess.
-	 * 
-	 * 
-	 * variableSwap
-	 * 
+	 *  
+	 * ~ variableSwap
 	 * For each line in a txt file, various %variables are replaced with their corresponding match.
 	 *  
-	 *  
-	 * linesProcess:				
-	 *
+	 * ~ linesProcess:				
 	 * How many lines in a document are determined, and thus how many pages to split it into.
 	 * The header is loaded from header-format and the variables are replaced
 	 * Finally the lines are sent to the player.
+	 * 
+	 * ~ onlineFile
+	 * Takes in a url that is wanted to be parsed, and returns a list of lines that are to be used.
+	 * It also includes a basic cache, as to not constantly request the file from the net.
+	 * The cache time limit can be modified in the config.yml
 	 */
 	
 	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
@@ -258,11 +292,7 @@ public class MCDocsListener extends PlayerListener {
         	String permission = "allow";
         	
         	if (playerCommand.equalsIgnoreCase(command)){
-        		//Log our user using the command.
-        		if (commandLogEnabled == true){
-        			log.info("MCDocs: " + player.getName() + ": " + event.getMessage());
-        		}
-        		
+       		
         		//Permissions check - Hopefully should default to allow if it isn't installed.
         		if (MCDocs.Permissions != null){
         			try{
@@ -270,39 +300,61 @@ public class MCDocsListener extends PlayerListener {
 	        			String group = MCDocs.Permissions.getGroup(player.getWorld().getName(), player.getName());
 	        			if((r.getGroup().equalsIgnoreCase(group)) || (r.getGroup().equals("null"))){
 	        				permission = "allow";
+	        				//Log our user using the command.
+	                		if (commandLogEnabled == true){
+	                			log.info("MCDocs: " + player.getName() + ": " + event.getMessage());
+	                		}
 	        			}
 	        			else{
 	        				permission = "deny";
 	        			}
 	        			if(!MCDocs.Permissions.has(player, permissionCommand)){
 	        				permission = "deny";
-	        				
 	        			}
         			}
         			catch(Exception ex){
             			log.info("[MCDocs] ERROR! Group not found for " + player.getName());
             		}
         		}
+        		else{
+        			//Log our user using the command.
+            		if (commandLogEnabled == true){
+            			log.info("MCDocs: " + player.getName() + ": " + event.getMessage());
+            		}
+        		}
+        		
         		if (permission == "allow"){
-	        		try {
+        			String fileName = r.getFile(); 
+        			
+        			//Online file use
+        			if(fileName.contains("http")){
+        				ArrayList<String> onlineLines = new ArrayList<String>();
+        				onlineLines = onlineFile(fileName);
+        				for(String o : onlineLines){
+        					lines.add(o);
+        				}
+        			}
+        			else{
+		        		try {		
+		        			//Regular files
 		        			//Add out lines to the list "lines"
-		                    FileInputStream fis = new FileInputStream(r.getFile());
-		                    Scanner scanner = new Scanner(fis, "UTF-8");
-		    	                while (scanner.hasNextLine()) {
-		    	                	try{
-		    	                		lines.add(scanner.nextLine() + " ");
-		    	                	}
-		    	                	catch(Exception ex){
-		    	                		lines.add(" ");
-		    	                	}
-		    	                }
-		                    scanner.close();
-		                    fis.close();                                       
-	                 }	        		
-	                 catch (Exception ex) {
-	                	 	player.sendMessage("File not found!");
-	                 }
-	                
+			                    FileInputStream fis = new FileInputStream(fileName);
+			                    Scanner scanner = new Scanner(fis, "UTF-8");
+			    	                while (scanner.hasNextLine()) {
+			    	                	try{
+			    	                		lines.add(scanner.nextLine() + " ");
+			    	                	}
+			    	                	catch(Exception ex){
+			    	                		lines.add(" ");
+			    	                	}
+			    	                }
+			                    scanner.close();
+			                    fis.close();
+		        		}	        		
+		                catch (Exception ex) {
+		                	 	player.sendMessage("Error: " + ex);
+		                }
+        			}
 	                 //If split[lastInput] does not exist, or has a letter, page = 1
                     try{
                         page = Integer.parseInt(split[lastInput]);
@@ -396,7 +448,9 @@ public class MCDocsListener extends PlayerListener {
 	    			String[] firstSplit = tempString.split(" ");
 	    			for(String s : firstSplit){
 	    				if(s.contains("%include")){
-	    					String[] secondSplit = s.split("_");
+	    					s = " " + s;
+	    					String[] secondSplit = s.split("%include_");
+	    					s = s.replace(" ", "");
 	    					fixedLine = fixedLine.replace(s, "");
 	    					files.add(secondSplit[1]);
 	    				}
@@ -461,6 +515,173 @@ public class MCDocsListener extends PlayerListener {
         }
 	}
 	
+	private ArrayList<String> onlineFile(String url){
+		
+		//some variables for the method
+		MCDocsOnlineFiles file = null;
+		ArrayList<String> onlineLines = new ArrayList<String>();
+		ArrayList<MCDocsOnlineFiles> onlineFiles = new ArrayList<MCDocsOnlineFiles>();
+		
+		URL u;
+	    InputStream is = null;
+	    DataInputStream dis;
+	    Date now = new Date();
+	    long nowTime = now.getTime();
+	    int foundFile = 0;
+	    
+	    //Check if a cache file has been previouslt created... only attemtp to load it if it exists.
+	    if (!(new File(plugin.getDataFolder(), "cache/onlinefiles.data")).exists()){
+			log.info("[MCDocs] No cache file found... Will make a new one.");
+		}
+	    else{
+	    	ArrayList<String> tmpList = new ArrayList<String>();
+	        try {
+	        	File folder = plugin.getDataFolder();
+	    	    String folderName = folder.getParent();
+				FileInputStream fis = new FileInputStream(folderName + "/MCDocs/cache/onlinefiles.data");
+                Scanner scanner = new Scanner(fis, "UTF-8");
+	                while (scanner.hasNextLine()) {
+	                	try{
+	                		tmpList.add(scanner.nextLine());
+	                	}
+	                	catch(Exception ex){
+	                	}
+	                }
+                scanner.close();
+                fis.close();
+	            for(String l : tmpList){
+	            	String[] split = l.split("~!!~");
+	            	file = new MCDocsOnlineFiles(Long.parseLong(split[0]), split[1]);
+	            	onlineFiles.add(file);
+	            }
+	        }
+	        catch(IOException e){
+	        	log.info("[MCDocs] error reading the cache file.");
+	        }
+	    }
+	    
+	    //create a new list to store are wanted objects
+	    ArrayList<MCDocsOnlineFiles> newOnlineFiles = new ArrayList<MCDocsOnlineFiles>();
+	    
+	    //go through all the existing online files found in the cache, and check if they are still under the cache limit.
+	    //delete all files, and entries, that are old.
+	    for(MCDocsOnlineFiles o : onlineFiles){
+	    	long fileTimeMs = o.getMs();
+			long timeDif = nowTime - fileTimeMs;
+	    	int cacheTimeMs = cacheTime * 60 * 1000;
+	    		    	
+	    	if(timeDif > cacheTimeMs){
+	    		File f = new File(plugin.getDataFolder(), "cache/" + fileTimeMs + ".txt");
+	    		f.delete();
+	    	}
+	    	else{
+	    		//add the objects we wish to keep.
+	    		newOnlineFiles.add(o);
+	    	}
+	    }
+	    
+	    //clear out the old, and replace them with the objects we wanted to keep.
+	    onlineFiles.clear();
+	    for(MCDocsOnlineFiles n : newOnlineFiles){
+	    	onlineFiles.add(n);
+	    }
+
+	    //now sinply go through our cache files and check if our url has been cached before...
+	    for(MCDocsOnlineFiles o : onlineFiles){
+	    	if(o.getURL().equalsIgnoreCase(url)){
+	    		File folder = plugin.getDataFolder();
+	    	    String folderName = folder.getParent();
+	    		String fileName = folderName + "/MCDocs/cache/" + Long.toString(o.getMs()) + ".txt";
+	    		try{
+	    		FileInputStream fis = new FileInputStream(fileName);
+                Scanner scanner = new Scanner(fis, "UTF-8");
+	                while (scanner.hasNextLine()) {
+	                	try{
+	                		onlineLines.add(scanner.nextLine() + " ");
+	                	}
+	                	catch(Exception ex){
+	                		onlineLines.add(" ");
+	                	}
+	                }
+                scanner.close();
+                fis.close();
+	    		}
+	    		catch (Exception ex) {
+            	 	log.info("[MCDocs] Oops! - The cache is broken :s - File Not Found.");
+	    		}
+	    		foundFile = 1;
+	    	}
+	    }
+	    
+	    //finally if there was no cache, or the url was not in the cache, download the online file and cache it.
+	    if(foundFile == 0){
+	    	try{
+	    		//import our online file
+				u = new URL(url);
+				is = u.openStream();  
+				dis = new DataInputStream(new BufferedInputStream(is));
+				Scanner scanner = new Scanner(dis, "UTF-8");
+				while (scanner.hasNextLine()) {
+                	try{
+                		onlineLines.add(scanner.nextLine() + " ");
+                	}
+                	catch(Exception ex){
+                		onlineLines.add(" ");
+                	}
+                }
+				
+				//Add our new file to the cache
+				file = new MCDocsOnlineFiles(nowTime, url);
+            	onlineFiles.add(file);
+            	
+            	//save our new file to the dir
+            	PrintWriter stream = null;
+            	File folder = plugin.getDataFolder();
+        		String folderName = folder.getParent();		
+        		try {
+        			new File(plugin.getDataFolder() + "/cache/").mkdir();
+        			stream = new PrintWriter(folderName + "/MCDocs/cache/" + nowTime + ".txt");
+        			for(String l : onlineLines){
+        				stream.println(l);
+                	}
+        			stream.close();
+        		} catch (FileNotFoundException e) {
+        			log.info("[MCDocs]: Error saving " + nowTime + ".txt");
+        		}
+            	
+			}
+			catch (MalformedURLException mue) {
+				log.info("[MCDocs] Ouch - a MalformedURLException happened.");
+	        }
+			catch (IOException ioe) {
+				log.info("[MCDocs] Oops - an IOException happened.");
+			}
+			finally {
+		         try {
+		            is.close();
+		         } 
+		         catch (IOException ioe) {
+	         	}
+			}
+	    }
+	    
+	    //save our updated cache file
+	    PrintWriter stream = null;
+		File folder = plugin.getDataFolder();
+		String folderName = folder.getParent();		
+		try {
+			stream = new PrintWriter(folderName + "/MCDocs/cache/onlinefiles.data");
+				for(MCDocsOnlineFiles o : onlineFiles){
+					stream.println(o.getMs() + "~!!~" + o.getURL());
+				}
+				stream.close();
+		} catch (FileNotFoundException e) {
+			log.info("[MCDocs]: Error saving the onlinefiles.data.");
+		}
+		//and finally return what we have found.
+		return onlineLines;
+	}
+	
 	/*
 	 * -- Variable Methods --
 	 * The following methods are used for various %variables in the txt files.
@@ -469,6 +690,9 @@ public class MCDocsListener extends PlayerListener {
 	 * onlineNames: Finds the current online players, and using online-players-format, applies some permissions variables.
 	 * onlineGroup: Finds the current online players, check if they're in the group specified, and using online-players-format, applies some permissions variables.
 	 * onlineCount: Returns the current amount of users online.
+	 * newsLine: Is used to insert the most recent lines (# defined in config.yml) from the defined news file (defined in the config.yml)
+	 * checkIfNumber: simple try catch to determine if a space is in a command. Example: /help iconomy 2
+	 * colorSwap: Uses the API to color swap instead of manually doing it.
 	 */
 	
 	private void includeAdd(String fileName, Player player){
@@ -479,6 +703,17 @@ public class MCDocsListener extends PlayerListener {
 		
 		//Ok, let's import our new file, and then send them into another variableSwap [ I   N   C   E   P   T   I   O   N ]
 		try {
+			//Online file use
+			if(fileName.contains("http")){
+				ArrayList<String> onlineLines = new ArrayList<String>();
+				onlineLines = onlineFile(fileName);
+				for(String o : onlineLines){
+					tempLines.add(o);
+				}
+			}
+			
+			//Regular files
+			else{
             FileInputStream fis = new FileInputStream(folderName + "/MCDocs/" + fileName);
             Scanner scanner = new Scanner(fis, "UTF-8");
                 while (scanner.hasNextLine()) {
@@ -490,7 +725,8 @@ public class MCDocsListener extends PlayerListener {
                 	}
                 }
             scanner.close();
-            fis.close();            
+            fis.close();
+			}
             //Methods inside of methods!
             variableSwap(player, tempLines);
          }	        		

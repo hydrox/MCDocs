@@ -76,14 +76,14 @@ public class MCDocs extends JavaPlugin {
 		
 	//Setup Function for Permissions
 	@SuppressWarnings("static-access")
-	public void setupPermissions() {
-		Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
+	private void setupPermissions() {
+		Plugin permissionsPlugin = this.getServer().getPluginManager().getPlugin("Permissions");
 		
 		if(this.Permissions == null) {
 			PluginDescriptionFile pdfFile = this.getDescription();
-			if(test != null) {
-				this.getServer().getPluginManager().enablePlugin(test);
-				Permissions = ((Permissions)test).getHandler();
+			if(permissionsPlugin != null) {
+				this.getServer().getPluginManager().enablePlugin(permissionsPlugin);
+				Permissions = ((Permissions)permissionsPlugin).getHandler();
 				log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - Hooked into Permissions.");
 			}
 			else {
