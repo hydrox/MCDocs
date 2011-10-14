@@ -27,12 +27,7 @@ import org.bukkit.event.Event;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.PluginManager;
-
-//Permissions Import
-import com.nijikokun.bukkit.Permissions.Permissions;
-import com.nijiko.permissions.PermissionHandler;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.util.config.Configuration;
+import org.bukkit.configuration.file.FileConfiguration;
 
 /**
  * MCDocs Plugin for Bukkit
@@ -46,8 +41,7 @@ public class MCDocs extends JavaPlugin {
 	//Listener, Logger, Permissions, Config.
 	private final MCDocsListener playerListener = new MCDocsListener(this);
 	public static final Logger log = Logger.getLogger("Minecraft");
-	public static PermissionHandler Permissions = null;
-	Configuration config;
+	FileConfiguration config;
 	
 	
 	public void onDisable() {
@@ -57,10 +51,7 @@ public class MCDocs extends JavaPlugin {
 	
 	public void onEnable() {
 		
-		config = getConfiguration();
-		
-		//Setup Permissions
-		setupPermissions();
+		config = this.getConfig();
 		
 		this.playerListener.setupConfig(config);
 		
@@ -72,24 +63,6 @@ public class MCDocs extends JavaPlugin {
 		//Check all is well
 		PluginDescriptionFile pdfFile = this.getDescription();
         log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - v" + pdfFile.getVersion() + " loaded.");
-	}
-		
-	//Setup Function for Permissions
-	@SuppressWarnings("static-access")
-	private void setupPermissions() {
-		Plugin permissionsPlugin = this.getServer().getPluginManager().getPlugin("Permissions");
-		
-		if(this.Permissions == null) {
-			PluginDescriptionFile pdfFile = this.getDescription();
-			if(permissionsPlugin != null) {
-				this.getServer().getPluginManager().enablePlugin(permissionsPlugin);
-				Permissions = ((Permissions)permissionsPlugin).getHandler();
-				log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - Hooked into Permissions.");
-			}
-			else {
-				log.info("[" + pdfFile.getName() + "] (Tazzernator/Andrew Tajsic) - Permissions absent! (Don't Worry, it's not essential!)" );
-			}
-		}
 	}
 }
 	

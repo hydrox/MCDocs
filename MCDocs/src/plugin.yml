@@ -1,9 +1,9 @@
 name: MCDocs
 main: com.tazzernator.bukkit.mcdocs.MCDocs
-version: 10
+version: 11pre
 description: Powerful Documentation and MOTD Plugin. Show information from a file or online using a command that you define.
 author: Tazzernator (Andrew Tajsic)
-website: http://atajsic.com/wiki/index.php/MCDocs
+website: http://tazzernator.com/
 commands:
   mcdocs:
     description: Reloads MCDocs
