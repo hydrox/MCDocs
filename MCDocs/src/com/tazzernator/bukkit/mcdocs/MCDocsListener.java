@@ -30,6 +30,7 @@ import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.Scanner;
@@ -37,17 +38,18 @@ import java.util.logging.Logger;
 
 //bukkit imports
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
 import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.configuration.InvalidConfigurationException;
-import org.bukkit.configuration.file.FileConfiguration;
 
-//iConomy import.
-import com.iConomy.*;
-import com.iConomy.system.Holdings;
+//Register imports
+import com.nijikokun.register.Register;
+import com.nijikokun.register.payment.Method;
+import com.nijikokun.register.payment.Methods;
 
 //Listener Class
 public class MCDocsListener extends PlayerListener {
@@ -55,13 +57,14 @@ public class MCDocsListener extends PlayerListener {
 	//Some Variables for the class.
 	private MCDocs plugin;
 	FileConfiguration config;
-	static iConomy iConomy = null;
+	static Register register = null;
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> fixedLines = new ArrayList<String>();
-	private ArrayList<MCDocsCommands> records = new ArrayList<MCDocsCommands>();
 	
 	private ArrayList<MCDocsCommands> commandsList = new ArrayList<MCDocsCommands>();
 	private ArrayList<MCDocsGroups> groupsList = new ArrayList<MCDocsGroups>();
+	private ArrayList<MCDocsMOTD> motdList = new ArrayList<MCDocsMOTD>();
+	private ArrayList<MCDocsOnlineFiles> onlineFiles = new ArrayList<MCDocsOnlineFiles>();
 	
 	//Config Defaults.
 	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
@@ -116,8 +119,32 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#For detailed assistance please visit: http://dev.bukkit.org/server-mods/mcdocs/");
 				stream.println();
 				stream.println("#Here we determine which command will show which file. ");
-				stream.println("commands-list:");
-				stream.println("- /about:about.txt");
+				stream.println("commands:");
+				stream.println("    /motd:");
+				stream.println("        file: 'motd.txt'");
+				stream.println("        groups:");
+				stream.println("            Admin: 'motd-admin.txt'");
+				stream.println("            Moderator: 'motd-moderator.txt'");
+				stream.println("    /rules:");
+				stream.println("        file: 'rules.txt'");
+				stream.println("    /news:");
+				stream.println("        file: 'news.txt'");
+				stream.println("    /register:");
+				stream.println("        file: 'register.txt'");
+				stream.println("    /about:");
+				stream.println("        file: 'http://tazzernator.com/files/bukkit/plugins/MCDocs/about.txt'");
+				stream.println("    /help:");
+				stream.println("        file: 'help/default.txt'");
+				stream.println("        groups:");
+				stream.println("            Admin: 'help/admin.txt'");
+				stream.println("            Moderator: 'help/moderator.txt'");
+				stream.println();
+				stream.println("#Here we determine which files are shown when a player joins the server.");
+				stream.println("motd:");
+				stream.println("    file: 'motd.txt'");
+				stream.println("    groups:");
+				stream.println("        Admin: 'motd-admin.txt'");
+				stream.println("        Moderator: 'motd-moderator.txt'");
 				stream.println();
 				stream.println("#This changes the pagination header that is added to MCDocs automatically when there is > 10 lines of text.");
 				stream.println("header-format: '&c%commandname - Page %current of %count &f| &7%command <page>'");
@@ -146,7 +173,7 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#Do you have any permissions system installed? Yes: true | No: false");
 				stream.println("permissions-enabled: false");
 				stream.println();
-				stream.println("#Here you should define any groups you have on the server and who is in them.");
+				stream.println("#MCDocs does not hook into any permissions program to find a players group, prefix, or suffix, so please outline them here...");
 				stream.println("groups:");
 				stream.println("    Admin:");
 				stream.println("        prefix: ''");
@@ -170,7 +197,9 @@ public class MCDocsListener extends PlayerListener {
 	}
 	
 	private void loadConfig(){
-		
+		commandsList.clear();
+		groupsList.clear();
+		motdList.clear();
 		
 	    String folderName = plugin.getDataFolder().getParent();
 			    
@@ -194,65 +223,47 @@ public class MCDocsListener extends PlayerListener {
 		newsLines = config.getInt("news-lines", newsLines);
 		cacheTime = config.getInt("cache-time", cacheTime);
 		
-		
+		//import our data and force find groups, commands, and motd information.
 		Map<String, Object> map = config.getValues(true);
 		
-		//Find our groups :)
+		//Default MOTD import
+		MCDocsMOTD motdRecord = new MCDocsMOTD(map.get("motd.file").toString(), "MCDocsGlobal");
+		motdList.add(motdRecord);
+		
 		for (String key : map.keySet()){
 			
-			//TODO: Commands to be here...
-			
-			//TODO: MOTD to be here...
-			
-			MCDocsGroups groupRecord = null;			
-			if(key.contains("groups.")){
+			//Commands Import
+			if(key.startsWith("commands.")){
 				String[] split = key.split("\\.");
 				if(split.length == 2){
-					groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString(), map.get(key + ".players").toString());
+					MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key + ".file").toString(), "MCDocsGlobal");
+					commandsList.add(commandRecord);
+				}
+				if(split.length == 4){
+					MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key).toString(), split[3].toString());
+					commandsList.add(commandRecord);
+				}
+			}
+			
+			//MOTD Import
+			if(key.startsWith("motd.groups.")){
+				String[] split = key.split("\\.");
+				MCDocsMOTD motdGroupRecord = new MCDocsMOTD(map.get(key).toString(), split[2].toString());
+				motdList.add(motdGroupRecord);
+			}
+			
+			//Groups Import
+			if(key.startsWith("groups.")){
+				String[] split = key.split("\\.");
+				if(split.length == 2){
+					MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString(), map.get(key + ".players").toString());
 					groupsList.add(groupRecord);
 				}
 			}
 		}
 		
-		for (MCDocsGroups g : groupsList){
-			log.info("Name: " + g.getName());
-			log.info("Prefix: " + g.getPrefix());
-			log.info("Suffix: " + g.getSuffix());
-			log.info("Player String: " + g.getPlayersString());
-		}
-
-		//Update our Commands
-        /*MCDocsCommands record = null;
-        records.clear();
-        
-        for (String c : commandsList){
-        	try{
-        		//I can't be arsed with regex.
-        		c = c.replace("http:", "http~colon~");
-        		String[] parts = c.split(":");
-        		
-        		if(parts.length == 3){
-        			if(parts[1].contains("http")){
-        				record = new MCDocsCommands(parts[0], parts[1].replace("http~colon~", "http:"), parts[2]);
-            		}
-        			else{
-        				record = new MCDocsCommands(parts[0], parts[1], parts[2]);
-        			}
-        		}
-        		else if(parts.length == 2){
-        			if(parts[1].contains("http")){
-        				record = new MCDocsCommands(parts[0], parts[1].replace("http~colon~", "http:"), "null");
-            		}
-        			else{
-        				record = new MCDocsCommands(parts[0], parts[1], "null");
-        			}
-           		}
-        		records.add(record);
-        	}
-        	catch (Exception e) {
-        		logit("Error reading the commandsList. config.yml incorrect.");
-        	}
-        }*/
+		//reverse the list so that the group files are placed before the global files.
+		Collections.reverse(commandsList);
 	}
 		
 	/*
@@ -285,6 +296,7 @@ public class MCDocsListener extends PlayerListener {
 		//Find the current Player, Message
 		String[] split = event.getMessage().split(" ");
         Player player = event.getPlayer();
+        boolean groupMessageSent = false;
         
         
         //Here we are going to support spaces in commands.
@@ -306,7 +318,7 @@ public class MCDocsListener extends PlayerListener {
 		playerCommand = playerCommand.trim();
 		
         
-		for (MCDocsCommands r : records){
+		for (MCDocsCommands r : commandsList){
         	lines.clear();
         	fixedLines.clear();
         	String command = r.getCommand();
@@ -314,27 +326,29 @@ public class MCDocsListener extends PlayerListener {
         	String permission = "allow";
         	
         	if (playerCommand.equalsIgnoreCase(command)){
-        		//Permissions check - Hopefully should default to allow if it isn't installed.
-    			String permissionCommand = "mcdocs." + command;
-    			// TODO have the groups in the config link here...
-    			String group = "To be done";
-    			if((r.getGroup().equalsIgnoreCase(group)) || (r.getGroup().equals("null"))){
+        		
+    			String[] groupInfo = getGroupInfo(player.getName());
+    			if((r.getGroup().equalsIgnoreCase(groupInfo[0])) || (r.getGroup().equals("MCDocsGlobal"))){
     				permission = "allow";
-    				//Log our user using the command.
-            		if (commandLogEnabled){
-            			logit("MCDocs: " + player.getName() + ": " + event.getMessage());
-            		}
     			}
     			else{
     				permission = "deny";
     			}
+    			
+    			//Bukkit Permissions
+    			String permissionCommand = "mcdocs." + command;
     			if((!player.hasPermission(permissionCommand)) && (permissionsEnabled)){ 
-    				player.sendMessage("passed through... :(");
     				permission = "deny";
     			}
     			
-    			if (permission == "allow"){
-        			String fileName = r.getFile(); 
+    			if ((permission == "allow") && (!groupMessageSent)){
+    				if(!r.getGroup().equals("MCDocsGlobal")){
+    					groupMessageSent = true;
+    				}
+    				
+        			String fileName = r.getFile();
+        			fileName = basicVariableSwap(player, fileName);
+
         			
         			//Online file use
         			if(fileName.contains("http")){
@@ -344,11 +358,12 @@ public class MCDocsListener extends PlayerListener {
         					lines.add(o);
         				}
         			}
+        			//Regular Files
         			else{
-            			//Regular files
-            			//Add out lines to the list "lines"
             			lines = fileReader(fileName);  		                
         			}
+        			
+        			
                     //If split[lastInput] does not exist, or has a letter, page = 1
                     try{
                         page = Integer.parseInt(split[lastInput]);
@@ -400,40 +415,34 @@ public class MCDocsListener extends PlayerListener {
         	fixedLine = fixedLine.replace("%ip", player.getAddress().getAddress().getHostAddress());
         	
         	//Permissions related variables
-        		//TODO Groups 
-        		String group = "To do groups";
-        		if(fixedLine.contains("%online_")){
-        			String tempString = fixedLine.trim();
-        			String[] firstSplit = tempString.split(" ");
-        			for(String s : firstSplit){
-        				if(s.contains("%online_")){
-        					String[] secondSplit = s.split("_");
-        					String groupName = secondSplit[1].toLowerCase();
-        					fixedLine = fixedLine.replace("%online_" + secondSplit[1], onlineGroup(groupName));
-        				}
-        			}
-        		}
-        		fixedLine = fixedLine.replace("%group", group);
-        		try{
-        			//TODO Suffix / Prefixes
-	        		//fixedLine = fixedLine.replace("%prefix", MCDocs.Permissions.getGroupPrefix(player.getWorld().getName(), group)); player.
-	        		//fixedLine = fixedLine.replace("%suffix", MCDocs.Permissions.getGroupSuffix(player.getWorld().getName(), group));
-        		}
-        		catch (Exception e){
-        			fixedLine = fixedLine.replace("%prefix", "");
-            		fixedLine = fixedLine.replace("%suffix", "");
-        		}
+    		String[] groupInfo = getGroupInfo(player.getName());
+    		if(fixedLine.contains("%online_")){
+    			String tempString = fixedLine.trim();
+    			String[] firstSplit = tempString.split(" ");
+    			for(String s : firstSplit){
+    				if(s.contains("%online_")){
+    					String[] secondSplit = s.split("_");
+    					String groupName = secondSplit[1].toLowerCase();
+    					fixedLine = fixedLine.replace("%online_" + secondSplit[1], onlineGroup(groupName));
+    				}
+    			}
+    		}
+    		fixedLine = fixedLine.replace("%group", groupInfo[0]);
+    		try{
+        		fixedLine = fixedLine.replace("%prefix", groupInfo[1]);
+        		fixedLine = fixedLine.replace("%suffix", groupInfo[2]);
+    		}
+    		catch (Exception e){
+    			fixedLine = fixedLine.replace("%prefix", "");
+        		fixedLine = fixedLine.replace("%suffix", "");
+    		}
         	
         	
         	//iConomy
-            if (this.plugin.getServer().getPluginManager().getPlugin("iConomy") != null) {
-            	try{        
-	                Holdings balance = com.iConomy.iConomy.getAccount(player.getName()).getHoldings();
-	                fixedLine = fixedLine.replaceAll("%balance", balance.toString());
-	            }
-            	catch(NoClassDefFoundError e){
-            		fixedLine = fixedLine.replaceAll("%balance", "Please update iConomy to v5 or higher");
-            	}
+            if (this.plugin.getServer().getPluginManager().getPlugin("Register") != null) {      
+	                Method  method = Methods.getMethod();
+	                double Amount = method.getAccount(player.getName()).balance();
+	                fixedLine = fixedLine.replaceAll("%balance", Double.toString(Amount));
               }
             
             //More Basics
@@ -477,7 +486,6 @@ public class MCDocsListener extends PlayerListener {
 			}
 		}
 	}
-	
 		
 	private void linesProcess(Player player, String command, int page){        
         //Define our page numbers
@@ -513,18 +521,36 @@ public class MCDocsListener extends PlayerListener {
         //Some Maths.
         int highNum = (page * 9);
         int lowNum = (page - 1) * 9;
-        for (int number = lowNum; ((number < highNum) && (number < size)); number++){
-        	player.sendMessage(fixedLines.get(number));
+        for (int number = lowNum; number < highNum; number++){
+        	if(number >= size){
+        		player.sendMessage(" ");
+        	}
+        	else{
+        		player.sendMessage(fixedLines.get(number));
+        	}
+        	
         }
 	}
 	
+	private String[] getGroupInfo(String player){
+		for(MCDocsGroups g : groupsList){
+			ArrayList<String> players = g.getPlayers();
+			for (String p : players){
+				if(p.equalsIgnoreCase(player)){
+					String[] ret = {g.getName(), g.getPrefix(), g.getSuffix()};
+					return ret;
+				}
+			}
+		}
+		String[] ret = {"","",""};
+		return ret;
+	}
 	
 	private ArrayList<String> onlineFile(String url){
 		
 		//some variables for the method
 		MCDocsOnlineFiles file = null;
 		ArrayList<String> onlineLines = new ArrayList<String>();
-		ArrayList<MCDocsOnlineFiles> onlineFiles = new ArrayList<MCDocsOnlineFiles>();
 		
 		URL u;
 	    InputStream is = null;
@@ -532,27 +558,6 @@ public class MCDocsListener extends PlayerListener {
 	    Date now = new Date();
 	    long nowTime = now.getTime();
 	    int foundFile = 0;
-	    
-	    //Check if a cache file has been previously created... only attempt to load it if it exists.
-	    if (!(new File(plugin.getDataFolder(), "cache/onlinefiles.data")).exists()){
-			log.info("[MCDocs] No cache file found... Will make a new one.");
-		}
-	    else{
-	    	ArrayList<String> tmpList = new ArrayList<String>();
-	    	
-	    	tmpList = fileReader("cache/onlinefiles.data");
-	    	
-	    	try{
-	            for(String l : tmpList){
-	            	String[] split = l.split("~!!~");
-	            	file = new MCDocsOnlineFiles(Long.parseLong(split[0]), split[1]);
-	            	onlineFiles.add(file);
-	            }
-	    	}
-	    	catch(Exception ex){
-	    		logit("Error reading the cache file.");
-	    	}
-	    }
 	    
 	    //create a new list to store our wanted objects
 	    ArrayList<MCDocsOnlineFiles> newOnlineFiles = new ArrayList<MCDocsOnlineFiles>();
@@ -640,24 +645,9 @@ public class MCDocsListener extends PlayerListener {
 	         	}
 			}
 	    }
-	    
-	    //save our updated cache file
-	    PrintWriter stream = null;
-		File folder = plugin.getDataFolder();
-		String folderName = folder.getParent();		
-		try {
-			stream = new PrintWriter(folderName + "/MCDocs/cache/onlinefiles.data");
-				for(MCDocsOnlineFiles o : onlineFiles){
-					stream.println(o.getMs() + "~!!~" + o.getURL());
-				}
-				stream.close();
-		} catch (FileNotFoundException e) {
-			log.info("[MCDocs]: Error saving the onlinefiles.data.");
-		}
 		//and finally return what we have found.
 		return onlineLines;
 	}
-	
 	
 	private ArrayList<String> fileReader(String fileName){
 		
@@ -686,17 +676,17 @@ public class MCDocsListener extends PlayerListener {
 		return tempLines;
 	}
 	
-	
 	private void logit(String message){
-		//TODO parse the logging messages
-		
-		
+		if(errorLogEnabled){
+			log.info("[MCDocs] " + message);
+		}				
 	}
 	
 	/*
 	 * -- Variable Methods --
 	 * The following methods are used for various %variables in the txt files.
 	 * 
+	 * basicVariableSwap: Used for dynamic file names.
 	 * includeAdd: Is used to insert more lines into the current working doc.
 	 * onlineNames: Finds the current online players, and using online-players-format, applies some permissions variables.
 	 * onlineGroup: Finds the current online players, check if they're in the group specified, and using online-players-format, applies some permissions variables.
@@ -705,6 +695,27 @@ public class MCDocsListener extends PlayerListener {
 	 * checkIfNumber: simple try catch to determine if a space is in a command. Example: /help iconomy 2
 	 * colorSwap: Uses the API to color swap instead of manually doing it.
 	 */
+	
+	private String basicVariableSwap(Player player, String string){
+		
+		String[] groupInfo = getGroupInfo(player.getName());
+		
+		string = string.replace("%name", player.getName());
+		string = string.replace("%size", onlineCount());
+		string = string.replace("%world", player.getWorld().getName());
+		string = string.replace("%ip", player.getAddress().getAddress().getHostAddress());    	
+		string = string.replace("%group", groupInfo[0]);
+		try{
+			string = string.replace("%prefix", groupInfo[1]);
+			string = string.replace("%suffix", groupInfo[2]);
+		}
+		catch (Exception e){
+			string = string.replace("%prefix", "");
+			string = string.replace("%suffix", "");
+		}
+		
+		return string;
+	}
 	
 	private void includeAdd(String fileName, Player player){
 		//Define some variables
@@ -737,24 +748,23 @@ public class MCDocsListener extends PlayerListener {
         String onlineNames = null;
         String nameFinal = null;
         for (Player o : online){
+        	
         	nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
-        		try{
-        			//TODO: Implement in house group prefix suffix
-	        		String group = "To be changed";
-	        		nameFinal = nameFinal.replace("%group", group);
-	        		//nameFinal = nameFinal.replace("%prefix", MCDocs.Permissions.getGroupPrefix(o.getWorld().getName(), group));
-	        		//nameFinal = nameFinal.replace("%suffix", MCDocs.Permissions.getGroupSuffix(o.getWorld().getName(), group));
-        		}
-        		catch(Exception ex){
-        			logit("Warning: One of the following is not found: %group %prefix %suffix for player " + o.getName());
-        		}
+        	
+    		String[] groupInfo = getGroupInfo(o.getName());
+    		nameFinal = nameFinal.replace("%group", groupInfo[0]);
+    		nameFinal = nameFinal.replace("%prefix", groupInfo[1]);
+    		nameFinal = nameFinal.replace("%suffix", groupInfo[2]);
+    		
         	nameFinal = colourSwap(nameFinal);
+        	
         	if (onlineNames == null){
         		onlineNames = nameFinal;
         	}
         	else{
         		onlineNames = onlineNames.trim() + "&f, " + nameFinal;
         	}
+        	
         }
         return onlineNames;
 	}
@@ -764,19 +774,16 @@ public class MCDocsListener extends PlayerListener {
         String onlineGroup = null;
         String nameFinal = null;
         for (Player o : online){
-        	String oGroup = "to be fixed";
-        	oGroup = oGroup.toLowerCase();
-        	if (oGroup.equals(group)){
-        		try{
+        	String groupInfo[] = getGroupInfo(o.getName());
+        	if (groupInfo[0].toLowerCase().equals(group)){
+
 	        		nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
-	        		nameFinal = nameFinal.replace("%group", oGroup);
-	        		nameFinal = nameFinal.replace("%prefix", "to be fixed");
-	        		nameFinal = nameFinal.replace("%suffix", "to be fixed");
+	        		nameFinal = nameFinal.replace("%group", groupInfo[0]);
+	        		nameFinal = nameFinal.replace("%prefix", groupInfo[1]);
+	        		nameFinal = nameFinal.replace("%suffix", groupInfo[2]);
 	            	nameFinal = colourSwap(nameFinal);
-        		}
-            	catch(Exception ex){
-        			logit("Warning: One of the following is not found: %group %prefix %suffix for player " + o.getName());
-        		}
+
+
             	if (onlineGroup == null){
             		onlineGroup = nameFinal;
             	}
@@ -793,10 +800,9 @@ public class MCDocsListener extends PlayerListener {
 	
 	private String onlineCount(){
 		Player online[] = plugin.getServer().getOnlinePlayers();
-        int onlineCount = online.length;;
+        int onlineCount = online.length;
         return Integer.toString(onlineCount);
-	}
-	
+	}	
 	
 	private void newsLine(Player player){
 		
@@ -839,7 +845,6 @@ public class MCDocsListener extends PlayerListener {
         return true;
     }
     
-	
     private String colourSwap(String line){
     	String[] Colours = { 	"&0", "&1", "&2", "&3", "&4", "&5", "&6", "&7",
 						        "&8", "&9", "&a", "&b", "&c", "&d", "&e", "&f",
@@ -864,27 +869,53 @@ public class MCDocsListener extends PlayerListener {
     
     /*
 	 * -- MOTD On Login -- 
-	 * We try to find a group motd file, and if that fails, we try and find a normal motd file, and if that fails we give up.
+	 * We produce motd information based on what is defined int he configuration.
 	 */
 	
 	public void onPlayerJoin(PlayerJoinEvent event){
-		//TODO motd shit
-	}
-
-	public void groupMotd(PlayerJoinEvent event){
-
-	}
-	
-	public void standardMotd(PlayerJoinEvent event){
 		ArrayList<String> lines = new ArrayList<String>();
-		Player player = event.getPlayer();
 		lines.clear();
-    	fixedLines.clear();	
+    	fixedLines.clear();
     	
-    	//TODO, change this to configuration
-    	lines = fileReader("motd.txt");
-          
+		Player player = event.getPlayer();
+		String[] group = getGroupInfo(player.getName());
+		String fileName = null;
+		
+		for(MCDocsMOTD m : motdList){
+			if(group[0].equalsIgnoreCase(m.getGroup())){
+				fileName = m.getFile();
+			}
+		}
+		
+		if(fileName == null){
+			fileName = motdList.get(0).getFile();
+		}
+		
+		fileName = basicVariableSwap(player, fileName);
+		
+		//Online file use
+    	if(fileName.contains("http")){
+			ArrayList<String> onlineLines = new ArrayList<String>();
+			onlineLines = onlineFile(fileName);
+			for(String o : onlineLines){
+				lines.add(o);
+			}
+		}
+		//Regular Files
+		else{
+			lines = fileReader(fileName);              
+		}
         variableSwap(player, lines);
-        linesProcess(player, "/motd", 1);
+        linesProcess(player, "/motd", 1);		
 	}
+	//finished! \o/ <3 Tazz
+	
+	/*		[FpsC] Promythyus: needs more turtles
+			[FpsC] Tazzernator: Does adding your exclamation that an increase in turtles prove suffice?
+			[FpsC] Promythyus: i suppose
+			[FpsC] Tazzernator: \o/
+			[FpsC] Promythyus: so long as you commit that
+			[FpsC] Tazzernator: done deal!
+	 */
+
 }
