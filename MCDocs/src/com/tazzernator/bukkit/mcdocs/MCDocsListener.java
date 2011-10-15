@@ -374,7 +374,7 @@ public class MCDocsListener extends PlayerListener {
                     
                     //Finally - Process our lines!
                     variableSwap(player, lines);
-                    linesProcess(player, command, page);
+                    linesProcess(player, command, page, false);
                     
                     if (commandLogEnabled){
             			log.info("MCDocs: " + player.getName() + ": " + event.getMessage());
@@ -487,7 +487,7 @@ public class MCDocsListener extends PlayerListener {
 		}
 	}
 		
-	private void linesProcess(Player player, String command, int page){        
+	private void linesProcess(Player player, String command, int page, boolean motd){        
         //Define our page numbers
         int size = fixedLines.size();
         int pages;
@@ -523,12 +523,14 @@ public class MCDocsListener extends PlayerListener {
         int lowNum = (page - 1) * 9;
         for (int number = lowNum; number < highNum; number++){
         	if(number >= size){
-        		player.sendMessage(" ");
+        		if(!motd){
+        			player.sendMessage(" ");
+        		}
         	}
         	else{
-        		player.sendMessage(fixedLines.get(number));
+        		player.sendMessage(fixedLines.get(number));     
         	}
-        	
+        		   	
         }
 	}
 	
@@ -906,7 +908,7 @@ public class MCDocsListener extends PlayerListener {
 			lines = fileReader(fileName);              
 		}
         variableSwap(player, lines);
-        linesProcess(player, "/motd", 1);		
+        linesProcess(player, "/motd", 1, true);		
 	}
 	//finished! \o/ <3 Tazz
 	
