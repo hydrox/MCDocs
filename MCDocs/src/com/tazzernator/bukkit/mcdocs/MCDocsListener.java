@@ -414,6 +414,33 @@ public class MCDocsListener extends PlayerListener {
         	fixedLine = fixedLine.replace("%world", player.getWorld().getName());
         	fixedLine = fixedLine.replace("%ip", player.getAddress().getAddress().getHostAddress());
         	
+        	//Time Based
+        	
+        	//--> WorldTime
+        	double worldTime = player.getWorld().getTime() + 6000;
+        	double relativeTime = worldTime % 24000;
+        	long worldHours = (long) (relativeTime / 1000);
+        	long worldMinutes = (long) (((relativeTime % 1000) * 0.6) / 10); //I'm assuming this is how it works. lel.
+        	String worldMinutesResult = "";
+        	String worldTimeResult = "";
+        	
+        	if(worldMinutes < 10){
+        		worldMinutesResult = "0" + worldMinutes;
+        	}
+        	else{
+        		worldMinutesResult = worldMinutes + "";
+        	}
+        	
+        	if(worldHours >= 12){
+        		worldHours -= 12;
+        		worldTimeResult = worldHours + ":" + worldMinutesResult + " PM";
+        	}
+        	else{
+        		worldTimeResult = worldHours + ":" + worldMinutesResult + " AM";
+        	}
+        	
+        	fixedLine = fixedLine.replace("%time", worldTimeResult);
+        	
         	//Permissions related variables
     		String[] groupInfo = getGroupInfo(player.getName());
     		if(fixedLine.contains("%online_")){
@@ -438,7 +465,7 @@ public class MCDocsListener extends PlayerListener {
     		}
         	
         	
-        	//iConomy
+        	//iConomy (Now Register)
             if (this.plugin.getServer().getPluginManager().getPlugin("Register") != null) {      
 	                Method  method = Methods.getMethod();
 	                double Amount = method.getAccount(player.getName()).balance();
@@ -523,7 +550,7 @@ public class MCDocsListener extends PlayerListener {
         int lowNum = (page - 1) * 9;
         for (int number = lowNum; number < highNum; number++){
         	if(number >= size){
-        		if(!motd){
+        		if(!motd && pages != 1){
         			player.sendMessage(" ");
         		}
         	}
