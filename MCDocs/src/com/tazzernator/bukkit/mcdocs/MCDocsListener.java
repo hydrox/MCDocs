@@ -227,39 +227,49 @@ public class MCDocsListener extends PlayerListener {
 		Map<String, Object> map = config.getValues(true);
 		
 		//Default MOTD import
-		MCDocsMOTD motdRecord = new MCDocsMOTD(map.get("motd.file").toString(), "MCDocsGlobal");
-		motdList.add(motdRecord);
+		try{
+			MCDocsMOTD motdRecord = new MCDocsMOTD(map.get("motd.file").toString(), "MCDocsGlobal");
+			motdList.add(motdRecord);
+		}
+		catch(Exception e){
+			logit("motd not defined in the config. No default motd will be shown...");
+		}
 		
-		for (String key : map.keySet()){
-			
-			//Commands Import
-			if(key.startsWith("commands.")){
-				String[] split = key.split("\\.");
-				if(split.length == 2){
-					MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key + ".file").toString(), "MCDocsGlobal");
-					commandsList.add(commandRecord);
+		try{
+			for (String key : map.keySet()){
+				
+				//Commands Import
+				if(key.startsWith("commands.")){
+					String[] split = key.split("\\.");
+					if(split.length == 2){
+						MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key + ".file").toString(), "MCDocsGlobal");
+						commandsList.add(commandRecord);
+					}
+					if(split.length == 4){
+						MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key).toString(), split[3].toString());
+						commandsList.add(commandRecord);
+					}
 				}
-				if(split.length == 4){
-					MCDocsCommands commandRecord = new MCDocsCommands(split[1].toString(), map.get(key).toString(), split[3].toString());
-					commandsList.add(commandRecord);
+				
+				//MOTD Import
+				if(key.startsWith("motd.groups.")){
+					String[] split = key.split("\\.");
+					MCDocsMOTD motdGroupRecord = new MCDocsMOTD(map.get(key).toString(), split[2].toString());
+					motdList.add(motdGroupRecord);
+				}
+				
+				//Groups Import
+				if(key.startsWith("groups.")){
+					String[] split = key.split("\\.");
+					if(split.length == 2){
+						MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString(), map.get(key + ".players").toString());
+						groupsList.add(groupRecord);
+					}
 				}
 			}
-			
-			//MOTD Import
-			if(key.startsWith("motd.groups.")){
-				String[] split = key.split("\\.");
-				MCDocsMOTD motdGroupRecord = new MCDocsMOTD(map.get(key).toString(), split[2].toString());
-				motdList.add(motdGroupRecord);
-			}
-			
-			//Groups Import
-			if(key.startsWith("groups.")){
-				String[] split = key.split("\\.");
-				if(split.length == 2){
-					MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString(), map.get(key + ".players").toString());
-					groupsList.add(groupRecord);
-				}
-			}
+		}
+		catch(Exception e){
+			logit("Your config.yml is incorrect." + e);
 		}
 		
 		//reverse the list so that the group files are placed before the global files.
@@ -336,9 +346,15 @@ public class MCDocsListener extends PlayerListener {
     			}
     			
     			//Bukkit Permissions
-    			String permissionCommand = "mcdocs." + command;
-    			if((!player.hasPermission(permissionCommand)) && (permissionsEnabled)){ 
-    				permission = "deny";
+    			if(permissionsEnabled){
+    				if(player.hasPermission("mcdocs.*")){
+    					//dolly
+    				}
+    				else{
+    					if(!player.hasPermission("mcdocs." + command)){
+    						permission = "deny";
+    					}
+    				}
     			}
     			
     			if ((permission == "allow") && (!groupMessageSent)){
