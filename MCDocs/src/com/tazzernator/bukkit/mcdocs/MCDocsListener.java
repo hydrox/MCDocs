@@ -716,9 +716,9 @@ public class MCDocsListener extends PlayerListener {
 		catch (Exception ex){
 			logit("Error: File '" + fileName + "' could not be read.");
 		}
-		
-		
+				
 		return tempLines;
+		
 	}
 	
 	private void logit(String message){
@@ -918,40 +918,42 @@ public class MCDocsListener extends PlayerListener {
 	 */
 	
 	public void onPlayerJoin(PlayerJoinEvent event){
-		ArrayList<String> lines = new ArrayList<String>();
-		lines.clear();
-    	fixedLines.clear();
-    	
-		Player player = event.getPlayer();
-		String[] group = getGroupInfo(player.getName());
-		String fileName = null;
-		
-		for(MCDocsMOTD m : motdList){
-			if(group[0].equalsIgnoreCase(m.getGroup())){
-				fileName = m.getFile();
+		if(motdEnabled){
+			ArrayList<String> lines = new ArrayList<String>();
+			lines.clear();
+	    	fixedLines.clear();
+	    	
+			Player player = event.getPlayer();
+			String[] group = getGroupInfo(player.getName());
+			String fileName = null;
+			
+			for(MCDocsMOTD m : motdList){
+				if(group[0].equalsIgnoreCase(m.getGroup())){
+					fileName = m.getFile();
+				}
 			}
-		}
-		
-		if(fileName == null){
-			fileName = motdList.get(0).getFile();
-		}
-		
-		fileName = basicVariableSwap(player, fileName);
-		
-		//Online file use
-    	if(fileName.contains("http")){
-			ArrayList<String> onlineLines = new ArrayList<String>();
-			onlineLines = onlineFile(fileName);
-			for(String o : onlineLines){
-				lines.add(o);
+			
+			if(fileName == null){
+				fileName = motdList.get(0).getFile();
 			}
+			
+			fileName = basicVariableSwap(player, fileName);
+			
+			//Online file use
+	    	if(fileName.contains("http")){
+				ArrayList<String> onlineLines = new ArrayList<String>();
+				onlineLines = onlineFile(fileName);
+				for(String o : onlineLines){
+					lines.add(o);
+				}
+			}
+			//Regular Files
+			else{
+				lines = fileReader(fileName);              
+			}
+	        variableSwap(player, lines);
+	        linesProcess(player, "/motd", 1, true);		
 		}
-		//Regular Files
-		else{
-			lines = fileReader(fileName);              
-		}
-        variableSwap(player, lines);
-        linesProcess(player, "/motd", 1, true);		
 	}
 	//finished! \o/ <3 Tazz
 	
