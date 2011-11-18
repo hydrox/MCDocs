@@ -44,12 +44,18 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 
 //Register imports
 import com.nijikokun.register.Register;
 import com.nijikokun.register.payment.Method;
 import com.nijikokun.register.payment.Methods;
+
+//GeoIPTools Import
+import uk.org.whoami.geoip.GeoIPLookup;
+import uk.org.whoami.geoip.GeoIPTools;
 
 //Listener Class
 public class MCDocsListener extends PlayerListener {
@@ -58,24 +64,28 @@ public class MCDocsListener extends PlayerListener {
 	private MCDocs plugin;
 	FileConfiguration config;
 	static Register register = null;
+	static GeoIPLookup geoIP = null;
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> fixedLines = new ArrayList<String>();
 	
 	private ArrayList<MCDocsCommands> commandsList = new ArrayList<MCDocsCommands>();
 	private ArrayList<MCDocsGroups> groupsList = new ArrayList<MCDocsGroups>();
+	private ArrayList<MCDocsPlayerJoin> joinList = new ArrayList<MCDocsPlayerJoin>();
+	private ArrayList<MCDocsPlayerQuit> quitList = new ArrayList<MCDocsPlayerQuit>();
 	private ArrayList<MCDocsMOTD> motdList = new ArrayList<MCDocsMOTD>();
 	private ArrayList<MCDocsOnlineFiles> onlineFiles = new ArrayList<MCDocsOnlineFiles>();
 	
 	//Config Defaults.
-	public String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
-	public String onlinePlayersFormat = "%prefix%name";
-	public String newsFile = "news.txt";
-	public int newsLines = 1;
-	public boolean motdEnabled = true;
-	public boolean commandLogEnabled = true;
-	public boolean errorLogEnabled = true;
-	public boolean permissionsEnabled = true;
-	public int cacheTime = 5;
+	private String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
+	private String onlinePlayersFormat = "%prefix%name";
+	private String newsFile = "news.txt";
+	private int newsLines = 1;
+	private boolean motdEnabled = true;
+	private boolean commandLogEnabled = true;
+	private boolean errorLogEnabled = true;
+	private boolean permissionsEnabled = true;
+	private boolean playerBroadcastMessageEnabled = true;
+	private int cacheTime = 5;
 	
 	/*
 	 * -- Constructor for MCDocsListener --
@@ -88,7 +98,7 @@ public class MCDocsListener extends PlayerListener {
 
 	/*
 	 * -- Configuration Methods --
-	 * We check for config.yml, if it doesn't exists we create a default (defaultCofig), then we load (loadConfig). 
+	 * We check for config.yml, if it doesn't exists we create a default (defaultConfig), then we load (loadConfig). 
 	 */
 	
 	public void setupConfig(FileConfiguration config){
@@ -118,6 +128,16 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#Configuration File.");
 				stream.println("#For detailed assistance please visit: http://dev.bukkit.org/server-mods/mcdocs/");
 				stream.println();
+				stream.println("#Here we define our groups that exist in on the server. More Info on devbukkit documentation.");
+				stream.println("#Make sure to use permission node mcdocs.group.GroupName (Example: mcdocs.group.Admin) in the respective groups.");
+				stream.println("groups:");
+				stream.println("    Admin:");
+				stream.println("        prefix: '&c'");
+				stream.println("        suffix: '&f'");
+				stream.println("    Moderator:");
+				stream.println("        prefix: ''");
+				stream.println("        suffix: ''");
+				stream.println();
 				stream.println("#Here we determine which command will show which file. ");
 				stream.println("commands:");
 				stream.println("    /motd:");
@@ -139,12 +159,29 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("            Admin: 'help/admin.txt'");
 				stream.println("            Moderator: 'help/moderator.txt'");
 				stream.println();
+				stream.println("#Show a MOTD at login? Yes: true | No: false");
+				stream.println("motd-enabled: true");
+				stream.println();
 				stream.println("#Here we determine which files are shown when a player joins the server.");
 				stream.println("motd:");
 				stream.println("    file: 'motd.txt'");
 				stream.println("    groups:");
 				stream.println("        Admin: 'motd-admin.txt'");
 				stream.println("        Moderator: 'motd-moderator.txt'");
+				stream.println();
+				stream.println("#Replace the vanilla join and quit messages? Yes: true | No: false");
+				stream.println("broadcast-enabled: true");
+				stream.println();
+				stream.println("#Here we determine what is announced to the server for each group on join and quit. ");
+				stream.println("#If you don't define a group it's own specific string, the default message is used.");	
+				stream.println("join:");
+				stream.println("    message: '%prefix%group%suffix (%prefix%name%suffix) has joined from %country.'");
+				stream.println("    groups:");
+				stream.println("        Admin: '%prefix%group%suffix (%prefix%name%suffix) has joined the server. Respect the admins.'");
+				stream.println("quit:");
+				stream.println("    message: '%prefix%group%suffix (%prefix%name%suffix) has left the server.'");
+				stream.println("    groups:");
+				stream.println("        Admin: '%prefix%group%suffix (%prefix%name%suffix) has left the server. You can relax.'");
 				stream.println();
 				stream.println("#This changes the pagination header that is added to MCDocs automatically when there is > 10 lines of text.");
 				stream.println("header-format: '&c%commandname - Page %current of %count &f| &7%command <page>'");
@@ -153,7 +190,7 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("online-players-format: '%prefix%name'");
 				stream.println();
 				stream.println("#The file to displayed when using %news.");
-				stream.println("news-file: news.txt");
+				stream.println("news-file: 'news.txt'");
 				stream.println();
 				stream.println("#How many lines to show when using %news.");
 				stream.println("news-lines: 1");
@@ -161,10 +198,7 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#How long, in minutes, do you want online files to be cached locally? 0 = disable");
 				stream.println("cache-time: 5");
 				stream.println();
-				stream.println("#Show a MOTD at login? Yes: true | No: false");
-				stream.println("motd-enabled: true");
-				stream.println();
-				stream.println("#Inform the console when a player uses a command from the commands-list.");
+				stream.println("#Inform the console when a player uses a command from the commands list.");
 				stream.println("command-log-enabled: true");
 				stream.println();
 				stream.println("#Send warnings and errors to the main server log? Yes: true | No: false");
@@ -172,23 +206,6 @@ public class MCDocsListener extends PlayerListener {
 				stream.println();
 				stream.println("#Do you have any permissions system installed? Yes: true | No: false");
 				stream.println("permissions-enabled: false");
-				stream.println();
-				stream.println("#MCDocs does not hook into any permissions program to find a players group, prefix, or suffix, so please outline them here...");
-				stream.println("groups:");
-				stream.println("    Admin:");
-				stream.println("        prefix: ''");
-				stream.println("        suffix: ''");
-				stream.println("        players:");
-				stream.println("            - Admin1");
-				stream.println("            - Admin2");
-				stream.println("            - Admin3");
-				stream.println("    Moderator:");
-				stream.println("        prefix: ''");
-				stream.println("        suffix: ''");
-				stream.println("        players:");
-				stream.println("            - Moderator1");
-				stream.println("            - Moderator2");
-				stream.println("            - Moderator3");
 				stream.close();
 				
 		} catch (FileNotFoundException e) {
@@ -222,18 +239,10 @@ public class MCDocsListener extends PlayerListener {
 		newsFile = config.getString("news-file", newsFile);
 		newsLines = config.getInt("news-lines", newsLines);
 		cacheTime = config.getInt("cache-time", cacheTime);
+		playerBroadcastMessageEnabled = config.getBoolean("broadcast-enabled", playerBroadcastMessageEnabled);
 		
 		//import our data and force find groups, commands, and motd information.
 		Map<String, Object> map = config.getValues(true);
-		
-		//Default MOTD import
-		try{
-			MCDocsMOTD motdRecord = new MCDocsMOTD(map.get("motd.file").toString(), "MCDocsGlobal");
-			motdList.add(motdRecord);
-		}
-		catch(Exception e){
-			logit("motd not defined in the config. No default motd will be shown...");
-		}
 		
 		try{
 			for (String key : map.keySet()){
@@ -251,18 +260,59 @@ public class MCDocsListener extends PlayerListener {
 					}
 				}
 				
-				//MOTD Import
-				if(key.startsWith("motd.groups.")){
-					String[] split = key.split("\\.");
-					MCDocsMOTD motdGroupRecord = new MCDocsMOTD(map.get(key).toString(), split[2].toString());
-					motdList.add(motdGroupRecord);
+				if(motdEnabled){
+					//Default MOTD import
+					try{
+						MCDocsMOTD motdRecord = new MCDocsMOTD(map.get("motd.file").toString(), "MCDocsGlobal");
+						motdList.add(motdRecord);
+					}
+					catch(Exception e){
+						logit("motd not defined in the config. No default motd will be shown...");
+					}
+					
+					//MOTD Import
+					if(key.startsWith("motd.groups.")){
+						String[] split = key.split("\\.");
+						MCDocsMOTD motdGroupRecord = new MCDocsMOTD(map.get(key).toString(), split[2].toString());
+						motdList.add(motdGroupRecord);
+					}
+				}
+				
+				if(playerBroadcastMessageEnabled){
+					//Join Import
+					try{
+						MCDocsPlayerJoin joinRecord = new MCDocsPlayerJoin(map.get("join.message").toString(), "MCDocsGlobal");
+						joinList.add(joinRecord);
+					}
+					catch(Exception e){
+						logit("join string not defined in the config. No default join message will be shown...");
+					}
+					if(key.startsWith("join.groups.")){
+						String[] split = key.split("\\.");
+						MCDocsPlayerJoin joinGroupRecord = new MCDocsPlayerJoin(map.get(key).toString(), split[2].toString());
+						joinList.add(joinGroupRecord);
+					}					
+					
+					//Quit Import
+					try{
+						MCDocsPlayerQuit quitRecord = new MCDocsPlayerQuit(map.get("quit.message").toString(), "MCDocsGlobal");
+						quitList.add(quitRecord);
+					}
+					catch(Exception e){
+						logit("quit string not defined in the config. No default quit message will be shown...");
+					}
+					if(key.startsWith("quit.groups.")){
+						String[] split = key.split("\\.");
+						MCDocsPlayerQuit quitGroupRecord = new MCDocsPlayerQuit(map.get(key).toString(), split[2].toString());
+						quitList.add(quitGroupRecord);
+					}	
 				}
 				
 				//Groups Import
 				if(key.startsWith("groups.")){
 					String[] split = key.split("\\.");
 					if(split.length == 2){
-						MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString(), map.get(key + ".players").toString());
+						MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString());
 						groupsList.add(groupRecord);
 					}
 				}
@@ -337,7 +387,7 @@ public class MCDocsListener extends PlayerListener {
         	
         	if (playerCommand.equalsIgnoreCase(command)){
         		
-    			String[] groupInfo = getGroupInfo(player.getName());
+    			String[] groupInfo = getGroupInfo(player);
     			if((r.getGroup().equalsIgnoreCase(groupInfo[0])) || (r.getGroup().equals("MCDocsGlobal"))){
     				permission = "allow";
     			}
@@ -351,7 +401,7 @@ public class MCDocsListener extends PlayerListener {
     					//dolly
     				}
     				else{
-    					if(!player.hasPermission("mcdocs." + command)){
+    					if(!player.hasPermission("mcdocs.command." + command)){
     						permission = "deny";
     					}
     				}
@@ -458,7 +508,7 @@ public class MCDocsListener extends PlayerListener {
         	fixedLine = fixedLine.replace("%time", worldTimeResult);
         	
         	//Permissions related variables
-    		String[] groupInfo = getGroupInfo(player.getName());
+    		String[] groupInfo = getGroupInfo(player);
     		if(fixedLine.contains("%online_")){
     			String tempString = fixedLine.trim();
     			String[] firstSplit = tempString.split(" ");
@@ -483,12 +533,14 @@ public class MCDocsListener extends PlayerListener {
         	
         	//iConomy (Now Register)
             if (this.plugin.getServer().getPluginManager().getPlugin("Register") != null) {      
-	                Method  method = Methods.getMethod();
-	                double Amount = method.getAccount(player.getName()).balance();
-	                fixedLine = fixedLine.replaceAll("%balance", Double.toString(Amount));
-              }
+                Method method = Methods.getMethod();
+                double Amount = method.getAccount(player.getName()).balance();
+                fixedLine = fixedLine.replace("%balance", Double.toString(Amount));
+            }
+                        
             
             //More Basics
+            fixedLine = locationSwap(player, fixedLine);
         	fixedLine = fixedLine.replace("%online", onlineNames());
         	fixedLine = colourSwap(fixedLine);
         	fixedLine = fixedLine.replace("&#!", "&");
@@ -577,14 +629,12 @@ public class MCDocsListener extends PlayerListener {
         }
 	}
 	
-	private String[] getGroupInfo(String player){
+	private String[] getGroupInfo(Player player){
 		for(MCDocsGroups g : groupsList){
-			ArrayList<String> players = g.getPlayers();
-			for (String p : players){
-				if(p.equalsIgnoreCase(player)){
-					String[] ret = {g.getName(), g.getPrefix(), g.getSuffix()};
-					return ret;
-				}
+			if(player.hasPermission("mcdocs.group." + g.getName()))
+			{
+				String[] ret = {g.getName(), g.getPrefix(), g.getSuffix()};
+				return ret;
 			}
 		}
 		String[] ret = {"","",""};
@@ -743,21 +793,16 @@ public class MCDocsListener extends PlayerListener {
 	
 	private String basicVariableSwap(Player player, String string){
 		
-		String[] groupInfo = getGroupInfo(player.getName());
+		String[] groupInfo = getGroupInfo(player);
 		
 		string = string.replace("%name", player.getName());
 		string = string.replace("%size", onlineCount());
 		string = string.replace("%world", player.getWorld().getName());
 		string = string.replace("%ip", player.getAddress().getAddress().getHostAddress());    	
 		string = string.replace("%group", groupInfo[0]);
-		try{
-			string = string.replace("%prefix", groupInfo[1]);
-			string = string.replace("%suffix", groupInfo[2]);
-		}
-		catch (Exception e){
-			string = string.replace("%prefix", "");
-			string = string.replace("%suffix", "");
-		}
+		string = string.replace("%prefix", groupInfo[1]);
+		string = string.replace("%suffix", groupInfo[2]);
+		string = locationSwap(player, string);
 		
 		return string;
 	}
@@ -796,7 +841,7 @@ public class MCDocsListener extends PlayerListener {
         	
         	nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
         	
-    		String[] groupInfo = getGroupInfo(o.getName());
+    		String[] groupInfo = getGroupInfo(o);
     		nameFinal = nameFinal.replace("%group", groupInfo[0]);
     		nameFinal = nameFinal.replace("%prefix", groupInfo[1]);
     		nameFinal = nameFinal.replace("%suffix", groupInfo[2]);
@@ -819,7 +864,7 @@ public class MCDocsListener extends PlayerListener {
         String onlineGroup = null;
         String nameFinal = null;
         for (Player o : online){
-        	String groupInfo[] = getGroupInfo(o.getName());
+        	String groupInfo[] = getGroupInfo(o);
         	if (groupInfo[0].toLowerCase().equals(group)){
 
 	        		nameFinal = onlinePlayersFormat.replace("%name", o.getDisplayName());
@@ -900,69 +945,119 @@ public class MCDocsListener extends PlayerListener {
     	
     	for (int x = 0; x < Colours.length; x++) {
     		CharSequence cChk = null;
-            String temp = null;
 
             cChk = Colours[x];
             if (line.contains(cChk)) {
-                temp = line.replace(cChk, cCode[x].toString());
-                line = temp;
+            	line = line.replace(cChk, cCode[x].toString());
             }
         }
         return line;
     }
     
+    private String locationSwap(Player player, String line){
+    	
+    	if (this.plugin.getServer().getPluginManager().getPlugin("GeoIPTools") != null) {
+        	Plugin GeoIPTools = this.plugin.getServer().getPluginManager().getPlugin("GeoIPTools");
+        	geoIP = ((GeoIPTools) GeoIPTools).getGeoIPLookup(GeoIPLookup.COUNTRYDATABASE);
+        	
+        	String country = geoIP.getCountry(player.getAddress().getAddress()).getName();
+        	if(country == "N/A"){
+        		country = "Unknown"; 
+        	}
+        	
+        	line = line.replace("%country", country);        	
+        }
+    	
+    	return line;
+    	
+    }
     
     /*
-	 * -- MOTD On Login -- 
-	 * We produce motd information based on what is defined int he configuration.
+	 * -- On Player Join // Quit -- 
+	 * Message of the day, and server anouncements for player join and quit.
 	 */
 	
 	public void onPlayerJoin(PlayerJoinEvent event){
 		if(motdEnabled){
-			ArrayList<String> lines = new ArrayList<String>();
-			lines.clear();
-	    	fixedLines.clear();
-	    	
+			motdProcess(event.getPlayer());
+		}
+		if(playerBroadcastMessageEnabled){
 			Player player = event.getPlayer();
-			String[] group = getGroupInfo(player.getName());
-			String fileName = null;
+			String message = null;			
+			String[] group = getGroupInfo(player);
 			
-			for(MCDocsMOTD m : motdList){
-				if(group[0].equalsIgnoreCase(m.getGroup())){
-					fileName = m.getFile();
+			for(MCDocsPlayerJoin j : joinList){
+				if(group[0].equalsIgnoreCase(j.getGroup())){
+					message = j.getMessage();
 				}
 			}
 			
-			if(fileName == null){
-				fileName = motdList.get(0).getFile();
+			if(message == null){
+				message = joinList.get(0).getMessage();
 			}
 			
-			fileName = basicVariableSwap(player, fileName);
-			
-			//Online file use
-	    	if(fileName.contains("http")){
-				ArrayList<String> onlineLines = new ArrayList<String>();
-				onlineLines = onlineFile(fileName);
-				for(String o : onlineLines){
-					lines.add(o);
-				}
-			}
-			//Regular Files
-			else{
-				lines = fileReader(fileName);              
-			}
-	        variableSwap(player, lines);
-	        linesProcess(player, "/motd", 1, true);		
+			message = basicVariableSwap(player, message);
+			message = colourSwap(message);
+			event.setJoinMessage(message);
 		}
 	}
-	//finished! \o/ <3 Tazz
 	
-	/*		[FpsC] Promythyus: needs more turtles
-			[FpsC] Tazzernator: Does adding your exclamation that an increase in turtles prove suffice?
-			[FpsC] Promythyus: i suppose
-			[FpsC] Tazzernator: \o/
-			[FpsC] Promythyus: so long as you commit that
-			[FpsC] Tazzernator: done deal!
-	 */
-
+	public void onPlayerQuit(PlayerQuitEvent event){
+		if(playerBroadcastMessageEnabled){
+			
+			Player player = event.getPlayer();
+			String message = null;			
+			String[] group = getGroupInfo(player);
+			
+			for(MCDocsPlayerQuit q : quitList){
+				if(group[0].equalsIgnoreCase(q.getGroup())){
+					message = q.getMessage();
+				}
+			}
+			
+			if(message == null){
+				message = quitList.get(0).getMessage();
+			}
+			
+			message = basicVariableSwap(player, message);
+			message = colourSwap(message);
+			event.setQuitMessage(message);
+		}
+	}
+	
+	private void motdProcess(Player player){
+		ArrayList<String> lines = new ArrayList<String>();
+		lines.clear();
+    	fixedLines.clear();
+    	
+		String[] group = getGroupInfo(player);
+		String fileName = null;
+		
+		for(MCDocsMOTD m : motdList){
+			if(group[0].equalsIgnoreCase(m.getGroup())){
+				fileName = m.getFile();
+			}
+		}
+		
+		if(fileName == null){
+			fileName = motdList.get(0).getFile();
+		}
+		
+		fileName = basicVariableSwap(player, fileName);
+		
+		//Online file use
+    	if(fileName.contains("http")){
+			ArrayList<String> onlineLines = new ArrayList<String>();
+			onlineLines = onlineFile(fileName);
+			for(String o : onlineLines){
+				lines.add(o);
+			}
+		}
+		//Regular Files
+		else{
+			lines = fileReader(fileName);              
+		}
+        variableSwap(player, lines);
+        linesProcess(player, "/motd", 1, true);
+	}
 }

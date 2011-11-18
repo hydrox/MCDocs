@@ -18,32 +18,21 @@
 
 package com.tazzernator.bukkit.mcdocs;
 
-public class MCDocsGroups {
+public class MCDocsPlayerJoin {
 	
-	protected String groupName;
-	protected String groupPrefix;
-	protected String groupSuffix;
-	protected String playersString;
-
-	public MCDocsGroups(String groupName, String groupPrefix, String groupSuffix){
-		this.groupName = groupName;
-		this.groupPrefix = groupPrefix;
-		this.groupSuffix = groupSuffix;
+	protected String message;
+	protected String group;
+	
+	public MCDocsPlayerJoin(String message, String group){
+		this.message = message;
+		this.group = group;
 	}
 	
-	public String getName(){
-		return groupName;
+	public String getMessage(){
+		return message;
 	}
 	
-	public String getPrefix(){
-		return groupPrefix;
+	public String getGroup(){
+		return group;
 	}
-	
-	public String getSuffix(){
-		return groupSuffix;
-	}
-	
-	public String getPlayersString(){
-		return playersString;
-	}	
 }
