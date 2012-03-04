@@ -18,7 +18,7 @@
 
 package com.tazzernator.bukkit.mcdocs;
 
-//java imports
+//Java Imports
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -36,46 +36,40 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
-//bukkit imports
+//Bukkit Imports
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerListener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
-
-//Register imports
-import com.nijikokun.register.Register;
-import com.nijikokun.register.payment.Method;
-import com.nijikokun.register.payment.Methods;
 
 //GeoIPTools Import
 import uk.org.whoami.geoip.GeoIPLookup;
 import uk.org.whoami.geoip.GeoIPTools;
 
 //Listener Class
-public class MCDocsListener extends PlayerListener {
-	
+public class MCDocsListener implements Listener {
+		
 	//Some Variables for the class.
 	private MCDocs plugin;
 	FileConfiguration config;
-	static Register register = null;
 	static GeoIPLookup geoIP = null;
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> fixedLines = new ArrayList<String>();
 	
 	private ArrayList<MCDocsCommands> commandsList = new ArrayList<MCDocsCommands>();
-	private ArrayList<MCDocsGroups> groupsList = new ArrayList<MCDocsGroups>();
 	private ArrayList<MCDocsPlayerJoin> joinList = new ArrayList<MCDocsPlayerJoin>();
 	private ArrayList<MCDocsPlayerQuit> quitList = new ArrayList<MCDocsPlayerQuit>();
 	private ArrayList<MCDocsMOTD> motdList = new ArrayList<MCDocsMOTD>();
 	private ArrayList<MCDocsOnlineFiles> onlineFiles = new ArrayList<MCDocsOnlineFiles>();
 	
-	//Config Defaults.
+	//Configuration Defaults
 	private String headerFormat = "&c%commandname - Page %current of %count &f| &7%command <page>";
 	private String onlinePlayersFormat = "%prefix%name";
 	private String newsFile = "news.txt";
@@ -83,7 +77,6 @@ public class MCDocsListener extends PlayerListener {
 	private boolean motdEnabled = true;
 	private boolean commandLogEnabled = true;
 	private boolean errorLogEnabled = true;
-	private boolean permissionsEnabled = true;
 	private boolean playerBroadcastMessageEnabled = true;
 	private int cacheTime = 5;
 	
@@ -95,9 +88,10 @@ public class MCDocsListener extends PlayerListener {
 	public MCDocsListener(MCDocs instance) {
         this.plugin = instance;
     }
-
+	
+	
 	/*
-	 * -- Configuration Methods --
+	 * -- Configursation Methods --
 	 * We check for config.yml, if it doesn't exists we create a default (defaultConfig), then we load (loadConfig). 
 	 */
 	
@@ -127,16 +121,6 @@ public class MCDocsListener extends PlayerListener {
 				stream.println("#MCDocs " + pdfFile.getVersion() + " by Tazzernator / Andrew Tajsic");
 				stream.println("#Configuration File.");
 				stream.println("#For detailed assistance please visit: http://dev.bukkit.org/server-mods/mcdocs/");
-				stream.println();
-				stream.println("#Here we define our groups that exist in on the server. More Info on devbukkit documentation.");
-				stream.println("#Make sure to use permission node mcdocs.group.GroupName (Example: mcdocs.group.Admin) in the respective groups.");
-				stream.println("groups:");
-				stream.println("    Admin:");
-				stream.println("        prefix: '&c'");
-				stream.println("        suffix: '&f'");
-				stream.println("    Moderator:");
-				stream.println("        prefix: ''");
-				stream.println("        suffix: ''");
 				stream.println();
 				stream.println("#Here we determine which command will show which file. ");
 				stream.println("commands:");
@@ -203,9 +187,6 @@ public class MCDocsListener extends PlayerListener {
 				stream.println();
 				stream.println("#Send warnings and errors to the main server log? Yes: true | No: false");
 				stream.println("error-log-enabled: true");
-				stream.println();
-				stream.println("#Do you have any permissions system installed? Yes: true | No: false");
-				stream.println("permissions-enabled: false");
 				stream.close();
 				
 		} catch (FileNotFoundException e) {
@@ -213,9 +194,8 @@ public class MCDocsListener extends PlayerListener {
 		}
 	}
 	
-	private void loadConfig(){
+	public void loadConfig(){
 		commandsList.clear();
-		groupsList.clear();
 		motdList.clear();
 		
 	    String folderName = plugin.getDataFolder().getParent();
@@ -231,17 +211,16 @@ public class MCDocsListener extends PlayerListener {
 		}
 		
 		headerFormat = config.getString("header-format", headerFormat);
-		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);	
+		onlinePlayersFormat = config.getString("online-players-format", onlinePlayersFormat);
 		motdEnabled = config.getBoolean("motd-enabled", motdEnabled);
 		commandLogEnabled = config.getBoolean("command-log-enabled", commandLogEnabled);
 		errorLogEnabled = config.getBoolean("error-log-enabled", errorLogEnabled);
-		permissionsEnabled = config.getBoolean("permissions-enabled", permissionsEnabled);
 		newsFile = config.getString("news-file", newsFile);
 		newsLines = config.getInt("news-lines", newsLines);
 		cacheTime = config.getInt("cache-time", cacheTime);
 		playerBroadcastMessageEnabled = config.getBoolean("broadcast-enabled", playerBroadcastMessageEnabled);
 		
-		//import our data and force find groups, commands, and motd information.
+		//import our data and force find commands, and motd information.
 		Map<String, Object> map = config.getValues(true);
 		
 		try{
@@ -307,15 +286,6 @@ public class MCDocsListener extends PlayerListener {
 						quitList.add(quitGroupRecord);
 					}	
 				}
-				
-				//Groups Import
-				if(key.startsWith("groups.")){
-					String[] split = key.split("\\.");
-					if(split.length == 2){
-						MCDocsGroups groupRecord = new MCDocsGroups(split[1].toString(), map.get(key + ".prefix").toString(), map.get(key + ".suffix").toString());
-						groupsList.add(groupRecord);
-					}
-				}
 			}
 		}
 		catch(Exception e){
@@ -324,8 +294,8 @@ public class MCDocsListener extends PlayerListener {
 		
 		//reverse the list so that the group files are placed before the global files.
 		Collections.reverse(commandsList);
-	}
-		
+	}	
+	
 	/*
 	 * -- Main Methods --
 	 * ~ onPlayerCommandPreprocess:
@@ -348,8 +318,9 @@ public class MCDocsListener extends PlayerListener {
 	 * The cache time limit can be modified in the config.yml
 	 */
 	
+	@EventHandler
 	public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
-		
+				
 		//List of lines we read our first file into.
 		ArrayList<String> lines = new ArrayList<String>();
 		
@@ -396,16 +367,11 @@ public class MCDocsListener extends PlayerListener {
     			}
     			
     			//Bukkit Permissions
-    			if(permissionsEnabled){
-    				if(player.hasPermission("mcdocs.*")){
-    					//dolly
-    				}
-    				else{
-    					if(!player.hasPermission("mcdocs.command." + command)){
-    						permission = "deny";
-    					}
-    				}
-    			}
+				if(!MCDocs.permission.has(player, "mcdocs.*")){
+					if(!MCDocs.permission.has(player, "mcdocs.command." + command)){
+						permission = "deny";
+					}
+				}
     			
     			if ((permission == "allow") && (!groupMessageSent)){
     				if(!r.getGroup().equals("MCDocsGlobal")){
@@ -449,24 +415,6 @@ public class MCDocsListener extends PlayerListener {
     			event.setCancelled(true);
         	}
         }
-           
-        if(split[0].equalsIgnoreCase("/mcdocs")){
-        	if(player.hasPermission("mcdocs.reload") || player.isOp()){
-	    		try{
-	    			if(split[1].equalsIgnoreCase("-reload")){
-	        			loadConfig();
-	        			player.sendMessage("MCDocs has been reloaded.");
-	        			logit("Reloaded by " + player.getName());
-	        			event.setCancelled(true);
-	        		}
-	    		}
-	    		catch(Exception ex){
-	    			player.sendMessage("MCDocs");
-	    			player.sendMessage("/mcdocs -reload  |  Reloads MCDocs.");
-	        		event.setCancelled(true);
-	    		}
-        	}
-    	}
 	}
 	
 	private void variableSwap(Player player, ArrayList<String> lines){
@@ -531,12 +479,10 @@ public class MCDocsListener extends PlayerListener {
     		}
         	
         	
-        	//iConomy (Now Register)
-            if (this.plugin.getServer().getPluginManager().getPlugin("Register") != null) {      
-                Method method = Methods.getMethod();
-                double Amount = method.getAccount(player.getName()).balance();
-                fixedLine = fixedLine.replace("%balance", Double.toString(Amount));
-            }
+        	//iConomy
+    		if(MCDocs.economyEnabled){
+    			fixedLine = fixedLine.replace("%balance", Double.toString(MCDocs.economy.getBalance(player.toString())));
+    		}
                         
             
             //More Basics
@@ -630,14 +576,14 @@ public class MCDocsListener extends PlayerListener {
 	}
 	
 	private String[] getGroupInfo(Player player){
-		for(MCDocsGroups g : groupsList){
-			if(player.hasPermission("mcdocs.group." + g.getName()))
-			{
-				String[] ret = {g.getName(), g.getPrefix(), g.getSuffix()};
-				return ret;
-			}
-		}
-		String[] ret = {"","",""};
+		
+		String group = MCDocs.permission.getPrimaryGroup(player);
+		String prefix = "";
+		String suffix = "";
+		prefix = MCDocs.chat.getPlayerPrefix(player);
+		suffix = MCDocs.chat.getPlayerSuffix(player);
+				
+		String[] ret = {group, prefix, suffix};
 		return ret;
 	}
 	
@@ -771,7 +717,7 @@ public class MCDocsListener extends PlayerListener {
 		
 	}
 	
-	private void logit(String message){
+	public void logit(String message){
 		if(errorLogEnabled){
 			log.info("[MCDocs] " + message);
 		}				
@@ -977,7 +923,9 @@ public class MCDocsListener extends PlayerListener {
 	 * Message of the day, and server anouncements for player join and quit.
 	 */
 	
+    @EventHandler
 	public void onPlayerJoin(PlayerJoinEvent event){
+		
 		if(motdEnabled){
 			motdProcess(event.getPlayer());
 		}
@@ -1002,7 +950,9 @@ public class MCDocsListener extends PlayerListener {
 		}
 	}
 	
-	public void onPlayerQuit(PlayerQuitEvent event){
+    @EventHandler	
+    public void onPlayerQuit(PlayerQuitEvent event){
+				
 		if(playerBroadcastMessageEnabled){
 			
 			Player player = event.getPlayer();

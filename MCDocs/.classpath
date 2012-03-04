@@ -2,9 +2,8 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/bukkit-0.0.1-SNAPSHOT.jar"/>
-	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/PermissionsBukkit-1.2.jar"/>
-	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/Register-1.5.jar"/>
+	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/bukkit-1.1-R5-20120301.060311-27.jar"/>
 	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/GeoIPTools.jar"/>
+	<classpathentry kind="lib" path="C:/Users/atajsic/Documents/bukkit/Vault.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
