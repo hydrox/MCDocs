@@ -569,9 +569,15 @@ public class MCDocsListener implements Listener {
 		String group = MCDocs.permission.getPlayerGroup(player.getName());
 		String prefix = "";
 		String suffix = "";
-		prefix = MCDocs.permission.getPlayerInfo(player.getName(), "prefix");
-		suffix = MCDocs.permission.getPlayerInfo(player.getName(), "suffix");
-				
+		prefix = MCDocs.permission.getGroupInfo(group, "prefix");
+		suffix = MCDocs.permission.getGroupInfo(group, "suffix");
+
+		if (prefix == null) {
+			prefix = "";
+		}
+		if (suffix == null) {
+			suffix = "";
+		}
 		String[] ret = {group, prefix, suffix};
 		return ret;
 	}
@@ -733,7 +739,7 @@ public class MCDocsListener implements Listener {
 		string = string.replace("%name", player.getName());
 		string = string.replace("%size", onlineCount());
 		string = string.replace("%world", player.getWorld().getName());
-		string = string.replace("%ip", player.getAddress().getAddress().getHostAddress());    	
+		string = string.replace("%ip", player.getAddress().getAddress().getHostAddress());
 		string = string.replace("%group", groupInfo[0]);
 		string = string.replace("%prefix", groupInfo[1]);
 		string = string.replace("%suffix", groupInfo[2]);
@@ -910,8 +916,10 @@ public class MCDocsListener implements Listener {
 				}
 			}
 			
-			if(message == null){
+			if(message == null && joinList.size() != 0){
 				message = joinList.get(0).getMessage();
+			} else {
+				message = "";
 			}
 			
 			message = basicVariableSwap(player, message);
@@ -935,8 +943,10 @@ public class MCDocsListener implements Listener {
 				}
 			}
 			
-			if(message == null){
+			if(message == null && quitList.size() != 0){
 				message = quitList.get(0).getMessage();
+			} else {
+				message = "";
 			}
 			
 			message = basicVariableSwap(player, message);
