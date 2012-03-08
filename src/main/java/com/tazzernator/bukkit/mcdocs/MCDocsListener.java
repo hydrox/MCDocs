@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
-//Bukkit Imports
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -46,12 +45,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
-
-//GeoIPTools Import
-import uk.org.whoami.geoip.GeoIPLookup;
-import uk.org.whoami.geoip.GeoIPTools;
 
 //Listener Class
 public class MCDocsListener implements Listener {
@@ -59,7 +53,6 @@ public class MCDocsListener implements Listener {
 	//Some Variables for the class.
 	private MCDocs plugin;
 	FileConfiguration config;
-	static GeoIPLookup geoIP = null;
 	public static final Logger log = Logger.getLogger("Minecraft");
 	private ArrayList<String> fixedLines = new ArrayList<String>();
 	
@@ -367,8 +360,8 @@ public class MCDocsListener implements Listener {
     			}
     			
     			//Bukkit Permissions
-				if(!MCDocs.permission.has(player, "mcdocs.*")){
-					if(!MCDocs.permission.has(player, "mcdocs.command." + command)){
+				if(!player.hasPermission("mcdocs.*")){
+					if(!player.hasPermission("mcdocs.command." + command)){
 						permission = "deny";
 					}
 				}
@@ -477,16 +470,8 @@ public class MCDocsListener implements Listener {
     			fixedLine = fixedLine.replace("%prefix", "");
         		fixedLine = fixedLine.replace("%suffix", "");
     		}
-        	
-        	
-        	//iConomy
-    		if(MCDocs.economyEnabled){
-    			fixedLine = fixedLine.replace("%balance", Double.toString(MCDocs.economy.getBalance(player.toString())));
-    		}
-                        
-            
+
             //More Basics
-            fixedLine = locationSwap(player, fixedLine);
         	fixedLine = fixedLine.replace("%online", onlineNames());
         	fixedLine = colourSwap(fixedLine);
         	fixedLine = fixedLine.replace("&#!", "&");
@@ -577,11 +562,15 @@ public class MCDocsListener implements Listener {
 	
 	private String[] getGroupInfo(Player player){
 		
-		String group = MCDocs.permission.getPrimaryGroup(player);
+		if (MCDocs.permission == null) {
+			String[] ret = {"", "", ""};
+			return ret;
+		}
+		String group = MCDocs.permission.getPlayerGroup(player.getName());
 		String prefix = "";
 		String suffix = "";
-		prefix = MCDocs.chat.getPlayerPrefix(player);
-		suffix = MCDocs.chat.getPlayerSuffix(player);
+		prefix = MCDocs.permission.getPlayerInfo(player.getName(), "prefix");
+		suffix = MCDocs.permission.getPlayerInfo(player.getName(), "suffix");
 				
 		String[] ret = {group, prefix, suffix};
 		return ret;
@@ -748,7 +737,6 @@ public class MCDocsListener implements Listener {
 		string = string.replace("%group", groupInfo[0]);
 		string = string.replace("%prefix", groupInfo[1]);
 		string = string.replace("%suffix", groupInfo[2]);
-		string = locationSwap(player, string);
 		
 		return string;
 	}
@@ -898,24 +886,6 @@ public class MCDocsListener implements Listener {
             }
         }
         return line;
-    }
-    
-    private String locationSwap(Player player, String line){
-    	
-    	if (this.plugin.getServer().getPluginManager().getPlugin("GeoIPTools") != null) {
-        	Plugin GeoIPTools = this.plugin.getServer().getPluginManager().getPlugin("GeoIPTools");
-        	geoIP = ((GeoIPTools) GeoIPTools).getGeoIPLookup(GeoIPLookup.COUNTRYDATABASE);
-        	
-        	String country = geoIP.getCountry(player.getAddress().getAddress()).getName();
-        	if(country == "N/A"){
-        		country = "Unknown"; 
-        	}
-        	
-        	line = line.replace("%country", country);        	
-        }
-    	
-    	return line;
-    	
     }
     
     /*

@@ -21,38 +21,29 @@ package com.tazzernator.bukkit.mcdocs;
 //Java Import
 import java.util.logging.Logger;
 
-//Bukkit Import
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.RegisteredServiceProvider;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.PluginDescriptionFile;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.java.JavaPlugin;
 
-//Vault Import
-import net.milkbowl.vault.chat.Chat;
-import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.permission.Permission;
+import de.hydrox.bukkit.DroxPerms.DroxPerms;
+import de.hydrox.bukkit.DroxPerms.DroxPermsAPI;
 
 /**
  * MCDocs Plugin for Bukkit
  * 
- * @author Tazzernator
- *(Andrew Tajsic - atajsicDesigns - http://atajsic.com)
+ * @author Tazzernator, Hydrox
  *
  */
 
 public class MCDocs extends JavaPlugin {
 	
 	//Vault
-	public static Permission permission = null;
-	public static Economy economy = null;
-	public static Chat chat = null;
-	
-	public static Boolean economyEnabled = false;
-	  
+	public static DroxPermsAPI permission = null;
+
 	//Listener, Logger, Config.
 	private final MCDocsListener playerListener = new MCDocsListener(this);
 	public static final Logger log = Logger.getLogger("Minecraft");
@@ -73,29 +64,12 @@ public class MCDocs extends JavaPlugin {
 			return;
 		}
 		
-		try{
-			setupPermissions();
+
+		DroxPerms droxPerms = ((DroxPerms) this.getServer().getPluginManager().getPlugin("DroxPerms"));
+		if (droxPerms != null) {
+			permission = droxPerms.getAPI();
 		}
-		catch(Exception e){
-			log.info("[MCDocs] ERROR: Vault failed to load a permission scheme!");
-		}
-		
-		try{
-			setupChat();
-		}
-		catch(Exception e){
-			log.info("[MCDocs] ERROR: Vault failed to load the chat scheme!");
-		}
-		
-		try{
-			setupEconomy();
-			economyEnabled = true;
-		}
-		catch(Exception e){
-			log.info("[MCDocs] WARNING: No Economy plugin found..");
-		}
-	    
-				
+
 		config = this.getConfig();
 		this.playerListener.setupConfig(config);
 		
@@ -121,7 +95,7 @@ public class MCDocs extends JavaPlugin {
 		    			this.playerListener.logit("MCDocs has been reloaded through console");
 		    			return true;
 		    		}
-		    		else if(MCDocs.permission.has(player, "mcdocs.reload") || MCDocs.permission.has(player, "mcdocs.*") || player.isOp()){
+		    		else if(player.hasPermission("mcdocs.reload") || player.hasPermission("mcdocs.*") || player.isOp()){
 		    			this.playerListener.loadConfig();
 		    			player.sendMessage("MCDocs has been reloaded.");
 		    			this.playerListener.logit("Reloaded by " + player.getName());
@@ -136,33 +110,5 @@ public class MCDocs extends JavaPlugin {
     	}
     	return false;
     }
-
-
-	
-	private Boolean setupPermissions()
-	{
-		RegisteredServiceProvider<Permission> permissionProvider = getServer().getServicesManager().getRegistration(Permission.class);
-	    if (permissionProvider != null) {
-	      permission = (Permission)permissionProvider.getProvider();
-	    }
-	    if (permission != null) return Boolean.valueOf(true); return Boolean.valueOf(false);
-	}
-	
-	private Boolean setupChat()
-    {
-        RegisteredServiceProvider<Chat> chatProvider = getServer().getServicesManager().getRegistration(Chat.class);
-        if (chatProvider != null) {
-            chat = chatProvider.getProvider();
-        }
-
-        return (chat != null);
-    }
-
-	private boolean setupEconomy() {
-	    RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
-	    economy = (Economy)economyProvider.getProvider();
-	    return economy != null;
-	}
-	
 }
 	
