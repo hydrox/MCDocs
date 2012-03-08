@@ -4,6 +4,7 @@ version: ${project.version}
 description: Powerful Documentation and MOTD Plugin. Show information from a file or online using a command that you define.
 author: Tazzernator (Andrew Tajsic)
 website: http://dev.bukkit.org/server-mods/mcdocs/
+depend: [DroxPerms]
 commands:
   mcdocs:
     description: Reloads MCDocs

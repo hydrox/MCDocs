@@ -58,13 +58,6 @@ public class MCDocs extends JavaPlugin {
 	
 	public void onEnable() {
 		
-		if (getServer().getPluginManager().getPlugin("Vault") == null) {
-			log.info("[MCDocs] - ERROR: MCDocs requires Vault as a depandency. MCDocs has been disabled!");
-			getServer().getPluginManager().disablePlugin(this);
-			return;
-		}
-		
-
 		DroxPerms droxPerms = ((DroxPerms) this.getServer().getPluginManager().getPlugin("DroxPerms"));
 		if (droxPerms != null) {
 			permission = droxPerms.getAPI();
